@@ -12,6 +12,7 @@
 		"vscode": {
 			"extensions": [
 				"anthropic.claude-code",
+				"bierner.markdown-mermaid",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
 				"eamodio.gitlens"
