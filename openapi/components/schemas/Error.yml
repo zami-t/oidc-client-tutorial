@@ -1,0 +1,8 @@
+type: object
+required:
+  - error
+properties:
+  error:
+    type: string
+    description: エラー内容の概要
+    example: state mismatch

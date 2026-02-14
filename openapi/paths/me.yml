@@ -1,0 +1,34 @@
+get:
+  summary: ログインユーザー情報取得
+  description: |
+    Cookie のセッション ID から共有ストアのセッションを参照し、
+    ログイン済みユーザーの情報を返す。
+  operationId: getMe
+  tags:
+    - session
+  parameters:
+    - name: session_id
+      in: cookie
+      required: true
+      description: ログイン時に発行されたセッション ID
+      schema:
+        type: string
+  responses:
+    '200':
+      description: ログイン済みユーザー情報
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/MeResponse.yml
+    '401':
+      description: 未ログイン（セッションが存在しない、または期限切れ）
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+    '500':
+      description: 内部エラー
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml

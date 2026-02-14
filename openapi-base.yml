@@ -1,0 +1,267 @@
+openapi: "3.0.3"
+info:
+  title: OIDC Relying Party API
+  version: "1.0.0"
+  license:
+    name: MIT
+    url: https://spdx.org/licenses/MIT.html
+
+servers:
+  - url: https://rp.test
+    description: Example base URL
+
+security:
+  - SessionCookie: []
+
+paths:
+  /login:
+    get:
+      summary: 認可フロー開始
+      description: |
+        state / nonce を生成して共有インメモリストアに保存し、
+        OP の authorization_endpoint へ 302 リダイレクトする。
+      operationId: login
+      tags:
+        - auth
+      security: []
+      parameters: []
+      responses:
+        "302":
+          description: OP の authorization_endpoint へリダイレクト
+          headers:
+            Location:
+              description: |
+                OP の authorization_endpoint に以下のクエリパラメータを付与した URL。
+                - response_type=code
+                - client_id
+                - redirect_uri
+                - scope=openid
+                - state
+                - nonce
+              schema:
+                type: string
+                format: uri
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /callback:
+    get:
+      summary: 認可コールバック
+      description: |
+        OP からのリダイレクトを受け取り、以下を実行する。
+
+        1. クエリパラメータ `state` を共有ストアの値と照合（CSRF 検証）
+        2. `code` を使って OP の token_endpoint へ Token Request を送信
+        3. 取得した `id_token` の署名検証（JWKS）および Claims 検証（iss, aud, exp, nonce）
+        4. 認可トランザクション（state/nonce）を共有ストアから削除
+        5. セッションを作成し共有ストアに保存
+        6. Set-Cookie でセッション ID をブラウザに返却
+      operationId: callback
+      tags:
+        - auth
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: OP が発行した Authorization Code
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          description: Authorization Request 時に付与した state 値
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 認証成功。Set-Cookie ヘッダでセッション ID を返却する。
+          headers:
+            Set-Cookie:
+              description: |
+                セッション ID を格納した Cookie。
+                属性: HttpOnly, Secure, SameSite=Lax
+              schema:
+                type: string
+                example: "session_id=abc123; HttpOnly; Secure; SameSite=Lax; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallbackResponse"
+        "400":
+          description: |
+            リクエスト不正。以下のケースを含む。
+            - code または state が欠落
+            - state が共有ストアに存在しない（TTL 切れ含む）
+            - state が一致しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: |
+            認証失敗。以下のケースを含む。
+            - id_token の署名検証失敗
+            - id_token の Claims 検証失敗（iss, aud, exp, nonce）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: 内部エラー（Token Request 失敗、ストアアクセス失敗など）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /logout:
+    post:
+      summary: ログアウト
+      description: |
+        Cookie のセッション ID に対応するセッションを共有ストアから削除し、
+        Cookie を無効化する。
+      operationId: logout
+      tags:
+        - auth
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          description: ログイン時に発行されたセッション ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ログアウト成功。Set-Cookie でセッション Cookie を無効化する。
+          headers:
+            Set-Cookie:
+              description: セッション Cookie を即時失効させる
+              schema:
+                type: string
+                example: "session_id=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+        "401":
+          description: セッションが存在しない、または期限切れ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /me:
+    get:
+      summary: ログインユーザー情報取得
+      description: |
+        Cookie のセッション ID から共有ストアのセッションを参照し、
+        ログイン済みユーザーの情報を返す。
+      operationId: getMe
+      tags:
+        - session
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          description: ログイン時に発行されたセッション ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ログイン済みユーザー情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: 未ログイン（セッションが存在しない、または期限切れ）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /health:
+    get:
+      summary: ヘルスチェック
+      description: アプリケーションの稼働状態を返す。
+      operationId: healthCheck
+      tags:
+        - system
+      security: []
+      responses:
+        "200":
+          description: 正常稼働
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+  schemas:
+    CallbackResponse:
+      type: object
+      required:
+        - subject
+        - issuer
+      properties:
+        subject:
+          type: string
+          description: id_token の sub Claim（ユーザー識別子）
+          example: "1234567890"
+        issuer:
+          type: string
+          description: id_token の iss Claim（認証した OP）
+          example: "https://accounts.example.com"
+
+    MeResponse:
+      type: object
+      required:
+        - subject
+        - issuer
+      properties:
+        subject:
+          type: string
+          description: ユーザー識別子（id_token の sub）
+          example: "1234567890"
+        issuer:
+          type: string
+          description: 認証した OP の issuer
+          example: "https://accounts.example.com"
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          example: "ok"
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: エラー内容の概要
+          example: "state mismatch"

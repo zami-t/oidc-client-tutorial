@@ -1,0 +1,13 @@
+type: object
+required:
+  - subject
+  - issuer
+properties:
+  subject:
+    type: string
+    description: ユーザー識別子（id_token の sub）
+    example: '1234567890'
+  issuer:
+    type: string
+    description: 認証した OP の issuer
+    example: https://accounts.example.com
