@@ -1,0 +1,32 @@
+get:
+  summary: 認可フロー開始
+  description: |
+    state / nonce を生成して共有インメモリストアに保存し、
+    OP の authorization_endpoint へ 302 リダイレクトする。
+  operationId: login
+  tags:
+    - auth
+  security: []
+  parameters: []
+  responses:
+    "302":
+      description: OP の authorization_endpoint へリダイレクト
+      headers:
+        Location:
+          description: |
+            OP の authorization_endpoint に以下のクエリパラメータを付与した URL。
+            - response_type=code
+            - client_id
+            - redirect_uri
+            - scope=openid
+            - state
+            - nonce
+          schema:
+            type: string
+            format: uri
+    "500":
+      description: サーバーエラー
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml

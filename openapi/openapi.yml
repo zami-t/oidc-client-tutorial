@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: OIDC Relying Party API
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://spdx.org/licenses/MIT.html
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - SessionCookie: []
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+paths:
+  /login:
+    $ref: paths/login.yml
+  /callback:
+    $ref: paths/callback.yml
+  /logout:
+    $ref: paths/logout.yml
+  /me:
+    $ref: paths/me.yml
+  /health:
+    $ref: paths/health.yml

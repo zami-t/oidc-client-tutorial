@@ -1,0 +1,14 @@
+get:
+  summary: ヘルスチェック
+  description: アプリケーションの稼働状態を返す。
+  operationId: healthCheck
+  tags:
+    - system
+  security: []
+  responses:
+    "200":
+      description: 正常稼働
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/HealthResponse.yml

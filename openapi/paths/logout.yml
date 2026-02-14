@@ -1,0 +1,36 @@
+post:
+  summary: ログアウト
+  description: |
+    Cookie のセッション ID に対応するセッションを共有ストアから削除し、
+    Cookie を無効化する。
+  operationId: logout
+  tags:
+    - auth
+  parameters:
+    - name: session_id
+      in: cookie
+      required: true
+      description: ログイン時に発行されたセッション ID
+      schema:
+        type: string
+  responses:
+    '200':
+      description: ログアウト成功。Set-Cookie でセッション Cookie を無効化する。
+      headers:
+        Set-Cookie:
+          description: セッション Cookie を即時失効させる
+          schema:
+            type: string
+            example: session_id=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
+    '401':
+      description: セッションが存在しない、または期限切れ
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+    '500':
+      description: 内部エラー
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml

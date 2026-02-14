@@ -1,0 +1,13 @@
+type: object
+required:
+  - subject
+  - issuer
+properties:
+  subject:
+    type: string
+    description: id_token の sub Claim（ユーザー識別子）
+    example: '1234567890'
+  issuer:
+    type: string
+    description: id_token の iss Claim（認証した OP）
+    example: https://accounts.example.com

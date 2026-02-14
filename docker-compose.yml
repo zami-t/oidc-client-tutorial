@@ -1,0 +1,23 @@
+services:
+  openapi_bundle:
+    image: redocly/cli:latest
+    working_dir: /work
+    volumes:
+      - ./:/work
+    command:
+      - bundle
+      - openapi/openapi.yml
+      - -o
+      - openapi/openapi.bundle.yaml
+
+  redoc:
+    image: redocly/redoc:latest
+    depends_on:
+      openapi_bundle:
+        condition: service_completed_successfully
+    ports:
+      - "8090:80"
+    volumes:
+      - ./openapi:/usr/share/nginx/html/openapi
+    environment:
+      SPEC_URL: openapi/openapi.bundle.yaml

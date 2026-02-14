@@ -1,0 +1,14 @@
+apis:
+  main:
+    root: openapi/openapi.yml
+
+extends:
+  - recommended
+
+rules:
+  # Redirect-only endpoints (e.g. /login) are valid but may not have 2XX.
+  operation-2xx-response: off
+  # Health checks may intentionally only return 2XX/5XX.
+  operation-4xx-response: off
+  # This repo intentionally uses localhost during development.
+  no-server-example.com: off

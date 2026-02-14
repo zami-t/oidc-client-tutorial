@@ -1,0 +1,68 @@
+get:
+  summary: 認可コールバック
+  description: |
+    OP からのリダイレクトを受け取り、以下を実行する。
+
+    1. クエリパラメータ `state` を共有ストアの値と照合（CSRF 検証）
+    2. `code` を使って OP の token_endpoint へ Token Request を送信
+    3. 取得した `id_token` の署名検証（JWKS）および Claims 検証（iss, aud, exp, nonce）
+    4. 認可トランザクション（state/nonce）を共有ストアから削除
+    5. セッションを作成し共有ストアに保存
+    6. Set-Cookie でセッション ID をブラウザに返却
+  operationId: callback
+  tags:
+    - auth
+  security: []
+  parameters:
+    - name: code
+      in: query
+      required: true
+      description: OP が発行した Authorization Code
+      schema:
+        type: string
+    - name: state
+      in: query
+      required: true
+      description: Authorization Request 時に付与した state 値
+      schema:
+        type: string
+  responses:
+    "200":
+      description: 認証成功。Set-Cookie ヘッダでセッション ID を返却する。
+      headers:
+        Set-Cookie:
+          description: |
+            セッション ID を格納した Cookie。
+            属性: HttpOnly, Secure, SameSite=Lax
+          schema:
+            type: string
+            example: session_id=abc123; HttpOnly; Secure; SameSite=Lax; Path=/
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CallbackResponse.yml
+    "400":
+      description: |
+        リクエスト不正。以下のケースを含む。
+        - code または state が欠落
+        - state が共有ストアに存在しない（TTL 切れ含む）
+        - state が一致しない
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+    "401":
+      description: |
+        認証失敗。以下のケースを含む。
+        - id_token の署名検証失敗
+        - id_token の Claims 検証失敗（iss, aud, exp, nonce）
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+    "500":
+      description: 内部エラー（Token Request 失敗、ストアアクセス失敗など）
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
