@@ -7,7 +7,7 @@
 		},
 		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
-	"postCreateCommand": "npm install -g @anthropic-ai/claude-code",
+	"postCreateCommand": "npm install -g @anthropic-ai/claude-code @redocly/cli",
 	"customizations": {
 		"vscode": {
 			"extensions": [
