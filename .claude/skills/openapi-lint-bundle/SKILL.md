@@ -1,11 +1,11 @@
 ---
-name: openapi-generator
-description: OpenAPI仕様の編集・lint・bundleのベストプラクティス。OpenAPIを編集/検証/バンドルするときに使う。
+name: openapi-lint-bundle
+description: OpenAPI仕様のlint・bundleをするSKILL。OpenAPIを編集した後、検証/バンドルするときに使う。
 metadata:
   argument-hint: "[openapi/openapi.yml]"
 ---
 
-# OpenAPI Generator
+# OpenAPI Lint & Bundle
 
 ## 前提
 
