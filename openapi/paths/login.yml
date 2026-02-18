@@ -1,11 +1,9 @@
 get:
   summary: 認可フロー開始
   description: |
-    指定された IdP に対して認可フローを開始する。
-    state / nonce を生成して共有インメモリストアに保存し、
+    指定された IdP に対して認可フローを開始するエンドポイント。サーバーは指定された IdP に対応する。
     OP の authorization_endpoint へ 302 リダイレクトする。
 
-    認可リクエストには以下のパラメータを付与する（RFC 6749 Section 4.1.1, OIDC Core Section 3.1.2.1）。
   operationId: login
   tags:
     - auth
@@ -31,8 +29,8 @@ get:
             - client_id
             - redirect_uri（事前登録済みのコールバック URL）
             - scope=openid email profile
-            - state（CSRF 防止用、crypto/rand で生成、最低 128 bits）
-            - nonce（リプレイ攻撃防止用、crypto/rand で生成、最低 128 bits）
+            - state（CSRF 防止用ランダム値）
+            - nonce（リプレイ攻撃防止用ランダム値）
           schema:
             type: string
             format: uri
@@ -46,7 +44,7 @@ get:
             unknownIdp:
               $ref: ../components/examples/ErrorUnknownIdp.yml
     "500":
-      description: サーバーエラー（state/nonce 生成失敗、ストアアクセス失敗など）
+      description: サーバーエラー
       content:
         application/json:
           schema:
