@@ -2,12 +2,22 @@ type: object
 required:
   - subject
   - issuer
+  - email
 properties:
   subject:
     type: string
     description: id_token の sub Claim（ユーザー識別子）
-    example: '1234567890'
+    example: "1234567890"
   issuer:
     type: string
-    description: id_token の iss Claim（認証した OP）
-    example: https://accounts.example.com
+    description: id_token の iss Claim（認証した OP の issuer）
+    example: https://accounts.google.com
+  email:
+    type: string
+    format: email
+    description: id_token の email Claim（scope に email を含む場合）
+    example: user@example.com
+  name:
+    type: string
+    description: id_token の name Claim（scope に profile を含む場合）
+    example: John Doe

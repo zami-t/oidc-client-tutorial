@@ -1,0 +1,4 @@
+summary: id_token の検証失敗
+value:
+  error_detail_code: TOKEN_VERIFICATION_FAILED
+  message: id_token verification failed

@@ -28,9 +28,15 @@ post:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            sessionNotFound:
+              $ref: ../components/examples/ErrorSessionNotFound.yml
     '500':
       description: 内部エラー
       content:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            serverError:
+              $ref: ../components/examples/ErrorServerError.yml

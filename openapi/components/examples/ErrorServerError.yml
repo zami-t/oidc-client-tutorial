@@ -1,0 +1,4 @@
+summary: サーバー内部エラー
+value:
+  error_detail_code: SERVER_ERROR
+  message: internal server error

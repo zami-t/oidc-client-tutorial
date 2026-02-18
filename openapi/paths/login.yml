@@ -1,13 +1,25 @@
 get:
   summary: 認可フロー開始
   description: |
+    指定された IdP に対して認可フローを開始する。
     state / nonce を生成して共有インメモリストアに保存し、
     OP の authorization_endpoint へ 302 リダイレクトする。
+
+    認可リクエストには以下のパラメータを付与する（RFC 6749 Section 4.1.1, OIDC Core Section 3.1.2.1）。
   operationId: login
   tags:
     - auth
   security: []
-  parameters: []
+  parameters:
+    - name: idp
+      in: query
+      required: true
+      description: 使用する IdP の識別子
+      schema:
+        type: string
+        enum:
+          - google
+        example: google
   responses:
     "302":
       description: OP の authorization_endpoint へリダイレクト
@@ -17,16 +29,28 @@ get:
             OP の authorization_endpoint に以下のクエリパラメータを付与した URL。
             - response_type=code
             - client_id
-            - redirect_uri
-            - scope=openid
-            - state
-            - nonce
+            - redirect_uri（事前登録済みのコールバック URL）
+            - scope=openid email profile
+            - state（CSRF 防止用、crypto/rand で生成、最低 128 bits）
+            - nonce（リプレイ攻撃防止用、crypto/rand で生成、最低 128 bits）
           schema:
             type: string
             format: uri
-    "500":
-      description: サーバーエラー
+    "400":
+      description: 不明な IdP が指定された
       content:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            unknownIdp:
+              $ref: ../components/examples/ErrorUnknownIdp.yml
+    "500":
+      description: サーバーエラー（state/nonce 生成失敗、ストアアクセス失敗など）
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+          examples:
+            serverError:
+              $ref: ../components/examples/ErrorServerError.yml

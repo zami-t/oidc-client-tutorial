@@ -1,0 +1,4 @@
+summary: 不明な IdP が指定された
+value:
+  error_detail_code: UNKNOWN_IDP
+  message: specified idp is not supported

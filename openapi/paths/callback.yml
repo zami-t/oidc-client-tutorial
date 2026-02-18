@@ -2,13 +2,18 @@ get:
   summary: 認可コールバック
   description: |
     OP からのリダイレクトを受け取り、以下を実行する。
+    どの IdP からのコールバックかは、共有ストアに保存した認可トランザクションから特定する。
 
-    1. クエリパラメータ `state` を共有ストアの値と照合（CSRF 検証）
-    2. `code` を使って OP の token_endpoint へ Token Request を送信
-    3. 取得した `id_token` の署名検証（JWKS）および Claims 検証（iss, aud, exp, nonce）
-    4. 認可トランザクション（state/nonce）を共有ストアから削除
-    5. セッションを作成し共有ストアに保存
-    6. Set-Cookie でセッション ID をブラウザに返却
+    1. `error` パラメータがあればエラー処理（RFC 6749 Section 4.1.2.1）
+    2. クエリパラメータ `state` を共有ストアの値と照合（CSRF 検証）
+    3. `code` を使って OP の token_endpoint へ Token Request を送信
+       - Content-Type: application/x-www-form-urlencoded
+       - パラメータ: code, client_id, client_secret, redirect_uri, grant_type=authorization_code
+    4. 取得した `id_token` の署名検証（JWKS, RS256）
+    5. `id_token` の Claims 検証（iss, aud, azp, exp, iat, nonce, sub）
+    6. 認可トランザクション（state/nonce）を共有ストアから削除
+    7. セッションを作成し共有ストアに保存
+    8. Set-Cookie でセッション ID をブラウザに返却
   operationId: callback
   tags:
     - auth
@@ -16,7 +21,7 @@ get:
   parameters:
     - name: code
       in: query
-      required: true
+      required: false
       description: OP が発行した Authorization Code
       schema:
         type: string
@@ -24,6 +29,20 @@ get:
       in: query
       required: true
       description: Authorization Request 時に付与した state 値
+      schema:
+        type: string
+    - name: error
+      in: query
+      required: false
+      description: |
+        認可エラー時に OP が返すエラーコード（RFC 6749 Section 4.1.2.1）。
+        このパラメータが存在する場合、認可は失敗している。
+      schema:
+        type: string
+    - name: error_description
+      in: query
+      required: false
+      description: エラーの詳細説明（RFC 6749 Section 4.1.2.1）
       schema:
         type: string
   responses:
@@ -44,6 +63,7 @@ get:
     "400":
       description: |
         リクエスト不正。以下のケースを含む。
+        - OP からの error パラメータが存在する（認可拒否等）
         - code または state が欠落
         - state が共有ストアに存在しない（TTL 切れ含む）
         - state が一致しない
@@ -51,18 +71,34 @@ get:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            stateMismatch:
+              $ref: ../components/examples/ErrorStateMismatch.yml
     "401":
       description: |
         認証失敗。以下のケースを含む。
-        - id_token の署名検証失敗
-        - id_token の Claims 検証失敗（iss, aud, exp, nonce）
+        - id_token の署名検証失敗（JWKS）
+        - id_token の Claims 検証失敗
+          - iss が Discovery メタデータの issuer と不一致
+          - aud に自アプリの client_id が含まれない
+          - azp が自アプリの client_id と不一致（aud が複数値の場合）
+          - exp が現在時刻以前（clockskew 最大 5 分許容）
+          - iat が妥当な範囲外
+          - nonce がセッション保存値と不一致
+          - sub が存在しない
       content:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            tokenVerificationFailed:
+              $ref: ../components/examples/ErrorTokenVerificationFailed.yml
     "500":
-      description: 内部エラー（Token Request 失敗、ストアアクセス失敗など）
+      description: 内部エラー（Token Request 失敗、JWKS 取得失敗、ストアアクセス失敗など）
       content:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yml
+          examples:
+            serverError:
+              $ref: ../components/examples/ErrorServerError.yml

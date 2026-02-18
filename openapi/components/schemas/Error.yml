@@ -1,8 +1,11 @@
 type: object
 required:
-  - error
+  - error_detail_code
+  - message
 properties:
-  error:
+  error_detail_code:
     type: string
-    description: エラー内容の概要
-    example: state mismatch
+    description: 発生しているエラーを表現するコード
+  message:
+    type: string
+    description: エラーの詳細メッセージ

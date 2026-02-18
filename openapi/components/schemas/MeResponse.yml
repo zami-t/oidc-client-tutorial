@@ -2,12 +2,27 @@ type: object
 required:
   - subject
   - issuer
+  - email
 properties:
   subject:
     type: string
     description: ユーザー識別子（id_token の sub）
-    example: '1234567890'
+    example: "1234567890"
   issuer:
     type: string
     description: 認証した OP の issuer
-    example: https://accounts.example.com
+    example: https://accounts.google.com
+  email:
+    type: string
+    format: email
+    description: ユーザーのメールアドレス
+    example: user@example.com
+  name:
+    type: string
+    description: ユーザーの表示名
+    example: John Doe
+  picture:
+    type: string
+    format: uri
+    description: ユーザーのプロフィール画像 URL
+    example: https://lh3.googleusercontent.com/a/example
