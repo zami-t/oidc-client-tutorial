@@ -1,47 +1,48 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは、このリポジトリで作業する Claude Code へのガイダンスを提供する。
 
-## Project Overview
+## プロジェクト概要
 
-OIDC Relying Party (Authorization Code Flow) implemented in Go without external OIDC libraries, for educational purposes. Go 1.25+, module name `oidc-tutorial`. No source code exists yet; detailed specs are in `.claude/rules/`.
+OIDC 関連の外部ライブラリを使わず Go で実装した OIDC Relying Party（Authorization Code Flow）。学習・理解目的。Go 1.25+、モジュール名 `oidc-tutorial`。詳細な仕様は `.claude/rules/` にある。
 
-See @README.md for project overview.
+@README.md も参照。
 
-## Canonical Docs (Source of Truth)
+## 正規ドキュメント（信頼できる唯一の情報源）
 
-The single source of truth lives under `.claude/rules/`. If anything in this file conflicts with the docs below, **prefer `.claude/rules/`**.
+正規の情報源は `.claude/rules/` 配下にある。このファイルと以下のドキュメントが矛盾する場合は、**`.claude/rules/` を優先する**。
 
-- @.claude/rules/coding-archtecture.md — layering, responsibilities, directory layout
-- @.claude/rules/system-archtecture.md — system-level architecture
-- @.claude/rules/security.md — OIDC flow and security requirements
-- @.claude/rules/shared-store.md — shared store schema, keys, and TTLs
-- @.claude/rules/coding-rules.md — Go conventions and project-specific coding rules
-- @.claude/rules/git-workflow.md — git workflow
+- `.claude/rules/` — アーキテクチャ・セキュリティ・コーディング規約・Git 運用など、設計・実装の規範となるルール群
 
-## Build & Development Commands
+## アーキテクチャ意思決定記録（ADR）
+
+設計上の意思決定は `.claude/decisions/` 配下に記録する。
+
+- `.claude/decisions/` — 設計上の意思決定とその背景・理由の記録（ADR）
+
+## ビルド・開発コマンド
 
 ```bash
-# Build
+# ビルド
 go build ./...
 
-# Run tests
+# テスト実行
 go test ./...
 
-# Run a single test
+# 単一テストの実行
 go test ./internal/domain/model -run TestFunctionName
 
-# Format + import management (run before commit)
+# フォーマット + インポート整理（コミット前に必ず実行）
 goimports -w .
 
 # Lint
 golangci-lint run
 
-# Static analysis
+# 静的解析
 go vet ./...
 ```
 
-Install required tools:
+必要ツールのインストール:
 ```bash
 go install golang.org/x/tools/cmd/goimports@latest
 ```
