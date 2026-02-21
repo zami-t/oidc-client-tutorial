@@ -18,6 +18,16 @@ get:
         enum:
           - google
         example: google
+    - name: return_to
+      in: query
+      required: true
+      description: |
+        認証成功後にリダイレクトするフロントエンドアプリの URL。
+        値は state と紐づけてサーバー側に保存され、コールバック時の Location ヘッダに使用される。
+      schema:
+        type: string
+        format: uri
+        example: https://myapp.example.com/dashboard
   responses:
     "302":
       description: OP の authorization_endpoint へリダイレクト

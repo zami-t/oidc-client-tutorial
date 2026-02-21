@@ -1,19 +1,6 @@
 get:
   summary: 認可コールバック
-  description: |
-    OP からのリダイレクトを受け取り、以下を実行する。
-    どの IdP からのコールバックかは、共有ストアに保存した認可トランザクションから特定する。
-
-    1. `error` パラメータがあればエラー処理（RFC 6749 Section 4.1.2.1）
-    2. クエリパラメータ `state` を共有ストアの値と照合（CSRF 検証）
-    3. `code` を使って OP の token_endpoint へ Token Request を送信
-       - Content-Type: application/x-www-form-urlencoded
-       - パラメータ: code, client_id, client_secret, redirect_uri, grant_type=authorization_code
-    4. 取得した `id_token` の署名検証（JWKS, RS256）
-    5. `id_token` の Claims 検証（iss, aud, azp, exp, iat, nonce, sub）
-    6. 認可トランザクション（state/nonce）を共有ストアから削除
-    7. セッションを作成し共有ストアに保存
-    8. Set-Cookie でセッション ID をブラウザに返却
+  description: リソースオーナー認証後、OP からのリダイレクトを受け取り、認証処理を完了するエンドポイント。
   operationId: callback
   tags:
     - auth
@@ -22,13 +9,15 @@ get:
     - name: code
       in: query
       required: false
-      description: OP が発行した Authorization Code
+      description: |
+        OP が発行した Authorization Code。
+        `error` パラメータが存在する場合は省略される（RFC 6749 Section 4.1.2, 4.1.2.1）。
       schema:
         type: string
     - name: state
       in: query
       required: true
-      description: Authorization Request 時に付与した state 値
+      description: Authorization Request 時に付与した state 値（RFC 6749 Section 4.1.2）
       schema:
         type: string
     - name: error
@@ -39,6 +28,14 @@ get:
         このパラメータが存在する場合、認可は失敗している。
       schema:
         type: string
+        enum:
+          - invalid_request
+          - access_denied
+          - unauthorized_client
+          - unsupported_response_type
+          - invalid_scope
+          - server_error
+          - temporarily_unavailable
     - name: error_description
       in: query
       required: false
@@ -46,27 +43,29 @@ get:
       schema:
         type: string
   responses:
-    "200":
-      description: 認証成功。Set-Cookie ヘッダでセッション ID を返却する。
+    "302":
+      description: 認証成功。Set-Cookie でセッションを設定し、フロントエンドアプリへリダイレクトする。
       headers:
+        Location:
+          description: リダイレクト先のフロントエンドアプリ URL。/login 時に指定された return_to の値。
+          schema:
+            type: string
+            format: uri
         Set-Cookie:
           description: |
             セッション ID を格納した Cookie。
             属性: HttpOnly, Secure, SameSite=Lax
           schema:
             type: string
-            example: session_id=abc123; HttpOnly; Secure; SameSite=Lax; Path=/
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/CallbackResponse.yml
-    "400":
+            example: session_id=<session-id>; HttpOnly; Secure; SameSite=Lax; Path=/
+    "403":
       description: |
-        リクエスト不正。以下のケースを含む。
+        認証・認可失敗。以下のケースを含む。
         - OP からの error パラメータが存在する（認可拒否等）
         - code または state が欠落
-        - state が共有ストアに存在しない（TTL 切れ含む）
-        - state が一致しない
+        - state の検証失敗（不一致、TTL 切れ含む）
+        - id_token の署名検証失敗
+        - id_token の Claims 検証失敗
       content:
         application/json:
           schema:
@@ -74,27 +73,10 @@ get:
           examples:
             stateMismatch:
               $ref: ../components/examples/ErrorStateMismatch.yml
-    "401":
-      description: |
-        認証失敗。以下のケースを含む。
-        - id_token の署名検証失敗（JWKS）
-        - id_token の Claims 検証失敗
-          - iss が Discovery メタデータの issuer と不一致
-          - aud に自アプリの client_id が含まれない
-          - azp が自アプリの client_id と不一致（aud が複数値の場合）
-          - exp が現在時刻以前（clockskew 最大 5 分許容）
-          - iat が妥当な範囲外
-          - nonce がセッション保存値と不一致
-          - sub が存在しない
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yml
-          examples:
             tokenVerificationFailed:
               $ref: ../components/examples/ErrorTokenVerificationFailed.yml
     "500":
-      description: 内部エラー（Token Request 失敗、JWKS 取得失敗、ストアアクセス失敗など）
+      description: サーバーエラー
       content:
         application/json:
           schema:

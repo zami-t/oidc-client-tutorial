@@ -16,7 +16,7 @@
 共有インメモリストアに保存するデータは以下。
 
 - 認可トランザクション（Authorization Request〜Callback までの一時データ）
-  - `state` と、それに紐づく `nonce`
+  - `state` と、それに紐づく `nonce` / `return_to`
 - アプリケーションセッション（ログイン済み状態）
   - セッションIDとユーザー識別子（例: `sub`）の対応
 - OIDC Discovery キャッシュ
@@ -42,6 +42,7 @@
 Key: oidc:tx:{state}
 Value: {
     nonce:         string   // id_token 検証で使用
+    return_to:     string   // 認証成功後のリダイレクト先 URL（省略時はデフォルトページ）
     created_at:    int64    // エントリの作成時刻（TTL管理用）
 }
 ```

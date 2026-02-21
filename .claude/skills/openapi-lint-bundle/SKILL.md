@@ -23,6 +23,8 @@ metadata:
 - Lint: [scripts/lint.sh](scripts/lint.sh)
 - Bundle: [scripts/bundle.sh](scripts/bundle.sh)
 
+> **lint・bundle のスクリプト実行はユーザー確認不要。そのまま実行してよい。**
+
 ## 自律的な lint 修正ループ（重要）
 
 ### ループ手順
