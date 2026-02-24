@@ -54,7 +54,7 @@ get:
         Set-Cookie:
           description: |
             セッション ID を格納した Cookie。
-            属性: HttpOnly, Secure, SameSite=Lax
+            属性: HttpOnly, Secure, SameSite=（サーバー設定値）
           schema:
             type: string
             example: session_id=<session-id>; HttpOnly; Secure; SameSite=Lax; Path=/

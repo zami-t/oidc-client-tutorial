@@ -14,15 +14,15 @@ post:
       schema:
         type: string
   responses:
-    '200':
+    "200":
       description: ログアウト成功。Set-Cookie でセッション Cookie を無効化する。
       headers:
         Set-Cookie:
-          description: セッション Cookie を即時失効させる
+          description: セッション Cookie を即時失効させる。SameSite はサーバー設定値に従う。
           schema:
             type: string
             example: session_id=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
-    '401':
+    "401":
       description: セッションが存在しない、または期限切れ
       content:
         application/json:
@@ -31,7 +31,7 @@ post:
           examples:
             sessionNotFound:
               $ref: ../components/examples/ErrorSessionNotFound.yml
-    '500':
+    "500":
       description: 内部エラー
       content:
         application/json:
