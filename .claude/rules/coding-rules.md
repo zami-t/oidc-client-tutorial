@@ -7,6 +7,7 @@ paths: **/*.go
 このドキュメントは、Goの公式スタイルガイドとコミュニティのベストプラクティスに基づいたコーディングルールです。
 
 **参照元**
+
 - [Effective Go](https://go.dev/doc/effective_go)
 - [Go Style Guide (Google)](https://google.github.io/styleguide/go/)
 - [Code Review Comments](https://go.dev/wiki/CodeReviewComments)
@@ -51,6 +52,7 @@ goimports -w .
 ```
 
 **`goimports` が行うこと**
+
 1. `gofmt` と同じコードフォーマット
 2. 未使用のインポートを削除
 3. 不足しているインポートを自動追加
@@ -79,6 +81,7 @@ package util
 ```
 
 **ルール**
+
 - 小文字のみ（アンダースコアや mixedCaps は使わない）
 - 短く簡潔に
 - 複数形にしない（`net/url` であって `net/urls` ではない）
@@ -101,6 +104,7 @@ func get_user_by_id(id string) User
 ```
 
 **ルール**
+
 - MixedCaps（キャメルケース）を使用
 - 定数も MixedCaps（`MAX_RETRIES` ではなく `MaxRetries`）
 - 1文字変数は避ける（ただし `i` などの慣習的なものは除く）
@@ -121,8 +125,9 @@ type APIConfig struct{}
 ```
 
 **ルール**
+
 - 頭字語は最初の文字のみ大文字にする
-- 例: `someApiUrl` ではなく `someAPIURL` は避け、`someApiUrl` を使う
+- 例: `someAPIURL` は避け、`someApiUrl` を使う
 
 ---
 
@@ -148,6 +153,7 @@ type ReadWriter interface {
 ```
 
 **ルール**
+
 - インターフェースは小さく保つ（1-3メソッド）
 - 必要なメソッドだけを含める
 - 大きなインターフェースは合成で作る
@@ -176,6 +182,7 @@ func (s *Service) RegisterUser(u User) error {
 ```
 
 **ルール**
+
 - インターフェースは使う側（消費側）で定義する
 - 提供側でインターフェースを先に定義しない
 
@@ -212,6 +219,7 @@ if err := db.Save(user); err != nil {
 ```
 
 **ルール**
+
 - エラーは常に処理する
 - `%w` でエラーをラップし、コンテキストを追加する
 - スタックトレースを保持する
@@ -244,6 +252,7 @@ func processData(ctx context.Context, data <-chan string) <-chan Result {
 ```
 
 **ルール**
+
 - goroutine には必ず終了条件を設ける
 - `context.Context` でライフサイクルを制御する
 - `defer close(ch)` でチャネルを閉じる
@@ -272,7 +281,7 @@ func TestAdd(t *testing.T) {
         t.Run(tt.name, func(t *testing.T) {
             result := Add(tt.a, tt.b)
             if result != tt.expected {
-                t.Errorf("Add(%d, %d) = %d, want %d", 
+                t.Errorf("Add(%d, %d) = %d, want %d",
                     tt.a, tt.b, result, tt.expected)
             }
         })
@@ -281,6 +290,7 @@ func TestAdd(t *testing.T) {
 ```
 
 **ルール**
+
 - テストケースが複数ある場合は table-driven を使う
 - `t.Run()` でサブテストを実行
 - 並列実行可能なテストは `t.Parallel()` を追加
@@ -300,6 +310,7 @@ package user
 ```
 
 **ルール**
+
 - パッケージの最初にパッケージコメントを書く
 - 何を提供するかを簡潔に説明
 
@@ -314,6 +325,7 @@ func GetUserByID(id string) (User, error) {
 ```
 
 **ルール**
+
 - 公開される関数・型・定数には必ずコメントを書く
 - コメントは対象の名前で始める
 - 完全な文章で書く
@@ -343,11 +355,13 @@ func Distance(p1, p2 Point) float64 {} // 値で渡す
 ```
 
 **ポインタを使う場合**
+
 - 構造体が大きい（コピーコストが高い）
 - 関数内で構造体を変更する必要がある
 - nil を返す必要がある
 
 **値を使う場合**
+
 - 構造体が小さい
 - 不変性を保ちたい
 
@@ -366,7 +380,7 @@ import (
 
     // 2. 外部ライブラリ
     "github.com/some/external/package"
-    
+
     // 3. 内部パッケージ
     "example.com/project/internal/domain"
     "example.com/project/internal/usecase"
@@ -374,6 +388,7 @@ import (
 ```
 
 **ルール**
+
 - 標準ライブラリ → 外部 → 内部の順
 - 各グループ間は空行で区切る
 - `goimports` が自動で整理する
@@ -471,13 +486,13 @@ func New() (*Service, error) {
 ```yaml
 linters:
   enable:
-    - errcheck      # エラーチェック漏れ検出
-    - gosimple      # コードの簡略化提案
-    - govet         # go vet の実行
-    - ineffassign   # 無駄な代入検出
-    - staticcheck   # 静的解析
-    - unused        # 未使用コード検出
-    - goimports     # インポートとフォーマットチェック
+    - errcheck # エラーチェック漏れ検出
+    - gosimple # コードの簡略化提案
+    - govet # go vet の実行
+    - ineffassign # 無駄な代入検出
+    - staticcheck # 静的解析
+    - unused # 未使用コード検出
+    - goimports # インポートとフォーマットチェック
 ```
 
 **参照**: [golangci-lint](https://golangci-lint.run/)
@@ -487,6 +502,7 @@ linters:
 ## まとめ
 
 **必ず守るルール**
+
 1. `goimports` でフォーマット + インポート整理
 2. エラーは必ず処理
 3. 公開APIにはコメント
@@ -494,6 +510,7 @@ linters:
 5. `golangci-lint` の使用
 
 **推奨ルール**
+
 1. 小さなインターフェース
 2. Table-driven tests
 3. goroutine のライフサイクル管理

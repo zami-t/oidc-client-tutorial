@@ -49,8 +49,8 @@ sequenceDiagram
     participant Store as 共有インメモリストア
 
     Browser->>RP: GET /login
-    RP->>RP: state/nonce/code_verifier を生成
-    RP->>Store: WRITE {state, nonce, code_verifier} (TTL)
+    RP->>RP: state/nonce を生成
+    RP->>Store: WRITE {state, nonce} (TTL)
     RP->>RP: Authorization Request を組み立て（authorization_endpoint + 各種パラメータ）
     RP-->>Browser: 302 Location: OP /authorize?... (Authorization Request)
 
@@ -59,15 +59,15 @@ sequenceDiagram
     OP-->>Browser: 302 redirect_uri?code=xxx&state=yyy
 
     Browser->>RP: GET /callback?code=xxx&state=yyy
-    RP->>Store: READ {state, nonce, code_verifier}
-    Store-->>RP: {state, nonce, code_verifier}
+    RP->>Store: READ {state, nonce}
+    Store-->>RP: {state, nonce}
     RP->>RP: state を検証
 
-    RP->>OP: POST Token Request (code + code_verifier)
+    RP->>OP: POST Token Request (code)
     OP-->>RP: {id_token, access_token}
     RP->>RP: id_token を検証 (nonce)
 
-    RP->>Store: DELETE {state, nonce, code_verifier}
+    RP->>Store: DELETE {state, nonce}
     RP->>Store: WRITE session (TTL)
     RP-->>Browser: 200 (Set-Cookie: session_id, 認証結果)
 ```
