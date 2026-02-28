@@ -31,3 +31,4 @@ go.work.sum
 # .idea/
 # .vscode/
 openapi/openapi.bundle.yaml
+.claude/settings.local.json
