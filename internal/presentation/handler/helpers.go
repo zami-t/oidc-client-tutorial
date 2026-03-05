@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"oidc-tutorial/internal/domain/model"
+	"oidc-tutorial/internal/usecase"
 )
 
 type errorResponse struct {
@@ -15,38 +15,44 @@ type errorResponse struct {
 
 // writeError maps an error to the appropriate HTTP status and JSON body.
 func writeError(w http.ResponseWriter, err error) {
-	var appErr *model.AppError
-	if errors.As(err, &appErr) {
-		switch appErr.Code {
-		case model.ErrCodeUnknownIdp:
-			writeJson(w, http.StatusBadRequest, errorResponse{
-				ErrorDetailCode: string(appErr.Code),
-				Message:         appErr.Message,
-			})
-		case model.ErrCodeStateMismatch,
-			model.ErrCodeTokenVerificationFailed,
-			model.ErrCodeAuthorizationError:
-			writeJson(w, http.StatusForbidden, errorResponse{
-				ErrorDetailCode: string(appErr.Code),
-				Message:         appErr.Message,
-			})
-		case model.ErrCodeSessionNotFound:
-			writeJson(w, http.StatusUnauthorized, errorResponse{
-				ErrorDetailCode: string(appErr.Code),
-				Message:         appErr.Message,
-			})
-		default:
-			writeJson(w, http.StatusInternalServerError, errorResponse{
-				ErrorDetailCode: string(model.ErrCodeServerError),
-				Message:         "internal server error",
-			})
-		}
-		return
+	switch {
+	case errors.Is(err, usecase.ErrLoginUnknownIdp):
+		writeJson(w, http.StatusBadRequest, errorResponse{
+			ErrorDetailCode: "UNKNOWN_IDP",
+			Message:         "unknown identity provider",
+		})
+	case errors.Is(err, usecase.ErrCallbackStateMismatch),
+		errors.Is(err, usecase.ErrCallbackTokenVerificationFailed),
+		errors.Is(err, usecase.ErrCallbackAuthorizationError):
+		writeJson(w, http.StatusForbidden, errorResponse{
+			ErrorDetailCode: errDetailCode(err),
+			Message:         err.Error(),
+		})
+	case errors.Is(err, usecase.ErrMeSessionNotFound),
+		errors.Is(err, usecase.ErrLogoutSessionNotFound):
+		writeJson(w, http.StatusUnauthorized, errorResponse{
+			ErrorDetailCode: "SESSION_NOT_FOUND",
+			Message:         "not authenticated",
+		})
+	default:
+		writeJson(w, http.StatusInternalServerError, errorResponse{
+			ErrorDetailCode: "SERVER_ERROR",
+			Message:         "internal server error",
+		})
 	}
-	writeJson(w, http.StatusInternalServerError, errorResponse{
-		ErrorDetailCode: string(model.ErrCodeServerError),
-		Message:         "internal server error",
-	})
+}
+
+func errDetailCode(err error) string {
+	switch {
+	case errors.Is(err, usecase.ErrCallbackStateMismatch):
+		return "STATE_MISMATCH"
+	case errors.Is(err, usecase.ErrCallbackTokenVerificationFailed):
+		return "TOKEN_VERIFICATION_FAILED"
+	case errors.Is(err, usecase.ErrCallbackAuthorizationError):
+		return "AUTHORIZATION_ERROR"
+	default:
+		return "SERVER_ERROR"
+	}
 }
 
 func writeJson(w http.ResponseWriter, status int, data any) {

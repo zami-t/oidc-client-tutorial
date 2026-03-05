@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 
-	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/usecase"
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
@@ -21,7 +20,7 @@ func NewMeHandler(uc *usecase.MeUsecase) *MeHandler {
 func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
-		writeError(w, model.NewAppError(model.ErrCodeSessionNotFound, "not authenticated", nil))
+		writeError(w, usecase.ErrMeSessionNotFound)
 		return
 	}
 

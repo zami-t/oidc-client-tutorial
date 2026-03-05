@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 
-	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/usecase"
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
@@ -23,7 +22,7 @@ func NewLogoutHandler(uc *usecase.LogoutUsecase, sameSite http.SameSite, secureC
 func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
-		writeError(w, model.NewAppError(model.ErrCodeSessionNotFound, "session_id cookie is missing", nil))
+		writeError(w, usecase.ErrLogoutSessionNotFound)
 		return
 	}
 

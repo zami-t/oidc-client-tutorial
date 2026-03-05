@@ -2,9 +2,16 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"oidc-tutorial/internal/domain/port"
 	"oidc-tutorial/internal/usecase/dto"
+)
+
+// Sentinel errors for MeUsecase.
+var (
+	ErrMeSessionNotFound = errors.New("session not found")
 )
 
 // MeUsecase returns the logged-in user's information from their session.
@@ -21,7 +28,10 @@ func NewMeUsecase(sessionRepo port.SessionRepository) *MeUsecase {
 func (u *MeUsecase) Execute(ctx context.Context, input dto.MeInput) (dto.MeOutput, error) {
 	session, err := u.sessionRepo.FindById(ctx, input.SessionId)
 	if err != nil {
-		return dto.MeOutput{}, err
+		if errors.Is(err, port.ErrSessionNotFound) {
+			return dto.MeOutput{}, fmt.Errorf("session not found: %w", ErrMeSessionNotFound)
+		}
+		return dto.MeOutput{}, fmt.Errorf("failed to lookup session: %w", err)
 	}
 	return dto.MeOutput{
 		Subject: session.Subject(),

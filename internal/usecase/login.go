@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -11,6 +12,11 @@ import (
 	"oidc-tutorial/internal/domain/port"
 	"oidc-tutorial/internal/domain/service"
 	"oidc-tutorial/internal/usecase/dto"
+)
+
+// Sentinel errors for LoginUsecase.
+var (
+	ErrLoginUnknownIdp = errors.New("unknown identity provider")
 )
 
 // LoginUsecase orchestrates the /login endpoint: generates state/nonce,
@@ -44,30 +50,26 @@ func NewLoginUsecase(
 func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.LoginOutput, error) {
 	provider, ok := u.providers[input.Idp]
 	if !ok {
-		return dto.LoginOutput{}, model.NewAppError(
-			model.ErrCodeUnknownIdp,
-			fmt.Sprintf("unknown IdP: %q", input.Idp),
-			nil,
-		)
+		return dto.LoginOutput{}, fmt.Errorf("idp %q: %w", input.Idp, ErrLoginUnknownIdp)
 	}
 
 	metadata, err := u.discoveryClient.GetProviderMetadata(ctx, provider.Issuer())
 	if err != nil {
-		return dto.LoginOutput{}, model.NewAppError(model.ErrCodeServerError, "failed to get provider metadata", err)
+		return dto.LoginOutput{}, fmt.Errorf("failed to get provider metadata: %w", err)
 	}
 
 	state, err := u.randomGen.Generate(32) // 256 bits
 	if err != nil {
-		return dto.LoginOutput{}, model.NewAppError(model.ErrCodeServerError, "failed to generate state", err)
+		return dto.LoginOutput{}, fmt.Errorf("failed to generate state: %w", err)
 	}
 	nonce, err := u.randomGen.Generate(32) // 256 bits
 	if err != nil {
-		return dto.LoginOutput{}, model.NewAppError(model.ErrCodeServerError, "failed to generate nonce", err)
+		return dto.LoginOutput{}, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
 	tx := model.NewAuthorizationTransaction(state, nonce, input.ReturnTo, input.Idp)
 	if err := u.transactionRepo.Save(ctx, tx, u.transactionTtl); err != nil {
-		return dto.LoginOutput{}, model.NewAppError(model.ErrCodeServerError, "failed to save transaction", err)
+		return dto.LoginOutput{}, fmt.Errorf("failed to save transaction: %w", err)
 	}
 
 	redirectUrl := buildAuthorizationUrl(metadata.AuthorizationEndpoint(), provider, state, nonce)

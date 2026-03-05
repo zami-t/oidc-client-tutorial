@@ -623,6 +623,87 @@ type UserRegistrationResponse struct {
 
 ---
 
+## エラーハンドリング規約
+
+### ポートファイルにセンチネルエラーを定義する
+
+Infrastructure 層が返しうるエラーは、対応する **ポートファイルにセンチネルエラーとして定義**する。
+「このポートが返しうるエラー」の契約がインターフェース定義と同じファイルに集約される。
+
+```go
+// domain/port/transaction_repository.go
+var ErrTransactionNotFound = errors.New("authorization transaction not found")
+```
+
+Infrastructure 実装はそれを `fmt.Errorf` でラップして返す。
+
+```go
+// infrastructure/repository/redis_transaction_repository.go
+if len(fields) == 0 {
+    return model.AuthorizationTransaction{}, fmt.Errorf("state %q: %w", state, port.ErrTransactionNotFound)
+}
+```
+
+### ユースケースファイルにセンチネルエラーを定義する
+
+各ユースケースが返しうるエラーは、**そのユースケースファイルの先頭に `var` ブロックで定義**する。
+各ユースケースが返しうるエラーの一覧がコードから明確になり、意図しない流用を防ぐ。
+
+```go
+// usecase/callback.go
+var (
+    ErrCallbackAuthorizationError      = errors.New("authorization error from OP")
+    ErrCallbackStateMismatch           = errors.New("state mismatch")
+    ErrCallbackTokenVerificationFailed = errors.New("token verification failed")
+)
+```
+
+ユースケースはリポジトリから受け取ったセンチネルエラーを `errors.Is` で検出し、自身のセンチネルエラーでラップして返す。
+
+```go
+// usecase/callback.go
+tx, err := u.transactionRepo.FindByState(ctx, input.State)
+if err != nil {
+    if errors.Is(err, port.ErrTransactionNotFound) {
+        return dto.CallbackOutput{}, fmt.Errorf("state not found or expired: %w", ErrCallbackStateMismatch)
+    }
+    return dto.CallbackOutput{}, fmt.Errorf("failed to lookup transaction: %w", err)
+}
+```
+
+### Presentation 層は `errors.Is` でエラーを検出する
+
+`writeError` などのエラーマッピングは、`errors.Is` でユースケースのセンチネルエラーを検出してHTTPステータスに変換する。
+
+```go
+// presentation/handler/helpers.go
+switch {
+case errors.Is(err, usecase.ErrCallbackStateMismatch),
+    errors.Is(err, usecase.ErrCallbackAuthorizationError):
+    writeJson(w, http.StatusForbidden, ...)
+case errors.Is(err, usecase.ErrMeSessionNotFound),
+    errors.Is(err, usecase.ErrLogoutSessionNotFound):
+    writeJson(w, http.StatusUnauthorized, ...)
+default:
+    writeJson(w, http.StatusInternalServerError, ...)
+}
+```
+
+### エラーフロー全体図
+
+```
+Infrastructure (repository)
+  └─ port.ErrXxx を fmt.Errorf でラップして返す
+        ↓
+Usecase
+  └─ errors.Is で port.ErrXxx を検出し、自身の ErrXxx でラップして返す
+        ↓
+Presentation (handler)
+  └─ errors.Is で usecase.ErrXxx を検出し、HTTP ステータスにマッピングする
+```
+
+---
+
 ### Bootstrap (依存関係解決)
 
 #### bootstrap/wire.go
