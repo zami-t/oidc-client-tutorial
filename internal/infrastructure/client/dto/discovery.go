@@ -1,7 +1,7 @@
 package dto
 
-// ProviderMetadataDto is the raw JSON from the OpenID Connect discovery endpoint.
-type ProviderMetadataDto struct {
+// DiscoveryResponse is the raw JSON from the OpenID Connect discovery endpoint.
+type DiscoveryResponse struct {
 	Issuer                           string   `json:"issuer"`
 	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
 	TokenEndpoint                    string   `json:"token_endpoint"`

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/domain/service"
 	infraClient "oidc-tutorial/internal/infrastructure/client"
@@ -17,14 +19,16 @@ import (
 
 // Config holds application configuration loaded from environment variables.
 type Config struct {
-	Port               string
-	GoogleClientId     string
-	GoogleClientSecret string
-	RedirectUri        string
-	AuthMethod         model.AuthMethod
-	SessionTtl         time.Duration
-	TransactionTtl     time.Duration
-	SecureCookie       bool
+	Port                    string
+	GoogleClientId          string
+	GoogleClientSecret      string
+	RedirectUri             string
+	AuthMethod              model.AuthMethod
+	SessionTtl              time.Duration
+	TransactionTtl          time.Duration
+	SecureCookie            bool
+	RedisAddr               string
+	DiscoveryTimeoutSeconds int
 }
 
 // App holds the configured HTTP router.
@@ -40,17 +44,23 @@ func InitializeApp() (*App, error) {
 	}
 
 	// Infrastructure
-	transactionRepo := repository.NewMemoryTransactionRepository()
-	sessionRepo := repository.NewMemorySessionRepository()
-	discoveryClient := infraClient.NewDiscoveryClient(
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisAddr,
+	})
+	transactionRepo := repository.NewRedisTransactionRepository(redisClient)
+	sessionRepo := repository.NewRedisSessionRepository(redisClient)
+	discoveryClient := infraClient.NewHttpDiscoveryClient(time.Duration(cfg.DiscoveryTimeoutSeconds) * time.Second)
+	discoveryCacheClient := infraClient.NewRedisDiscoveryCacheClient(
+		redisClient,
 		6*time.Hour, // metadata TTL
 		1*time.Hour, // JWKS TTL
 	)
+	orchestrator := infraClient.NewOrchestrateDiscoveryClient(discoveryClient, discoveryCacheClient)
 	tokenClient := infraClient.NewTokenClient()
 
 	// Domain
 	randomGen := service.RandomGenerator{}
-	tokenVerifier := service.NewIdTokenVerifier(discoveryClient)
+	tokenVerifier := service.NewIdTokenVerifier(orchestrator)
 
 	// Providers
 	googleProvider := model.NewProvider(
@@ -70,7 +80,7 @@ func InitializeApp() (*App, error) {
 	loginUC := usecase.NewLoginUsecase(
 		providers,
 		transactionRepo,
-		discoveryClient,
+		orchestrator,
 		randomGen,
 		cfg.TransactionTtl,
 	)
@@ -78,7 +88,7 @@ func InitializeApp() (*App, error) {
 		providers,
 		transactionRepo,
 		sessionRepo,
-		discoveryClient,
+		orchestrator,
 		tokenClient,
 		tokenVerifier,
 		randomGen,
@@ -150,14 +160,30 @@ func loadConfig() (*Config, error) {
 		port = "8080"
 	}
 
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+
+	discoveryTimeoutSeconds := 10
+	if v := os.Getenv("DISCOVERY_TIMEOUT_SECONDS"); v != "" {
+		seconds, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DISCOVERY_TIMEOUT_SECONDS: %w", err)
+		}
+		discoveryTimeoutSeconds = seconds
+	}
+
 	return &Config{
-		Port:               port,
-		GoogleClientId:     clientId,
-		GoogleClientSecret: clientSecret,
-		RedirectUri:        redirectUri,
-		AuthMethod:         authMethod,
-		SessionTtl:         sessionTtl,
-		TransactionTtl:     transactionTtl,
-		SecureCookie:       secureCookie,
+		Port:                    port,
+		GoogleClientId:          clientId,
+		GoogleClientSecret:      clientSecret,
+		RedirectUri:             redirectUri,
+		AuthMethod:              authMethod,
+		SessionTtl:              sessionTtl,
+		TransactionTtl:          transactionTtl,
+		SecureCookie:            secureCookie,
+		RedisAddr:               redisAddr,
+		DiscoveryTimeoutSeconds: discoveryTimeoutSeconds,
 	}, nil
 }

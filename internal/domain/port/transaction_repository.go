@@ -2,10 +2,15 @@ package port
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"oidc-tutorial/internal/domain/model"
 )
+
+// ErrTransactionNotFound is returned by FindByState when the authorization
+// transaction (state) does not exist or has expired.
+var ErrTransactionNotFound = errors.New("authorization transaction not found")
 
 // TransactionRepository manages authorization transaction state (oidc:tx:{state}).
 type TransactionRepository interface {
