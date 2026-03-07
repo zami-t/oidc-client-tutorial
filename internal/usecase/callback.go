@@ -97,7 +97,7 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 	tokenResp, err := u.tokenClient.Exchange(ctx, port.TokenExchangeRequest{
 		TokenEndpoint: metadata.TokenEndpoint(),
 		Code:          input.Code,
-		RedirectUri:   provider.RedirectUri(),
+		RedirectUri:   provider.Client().RedirectUri().String(),
 		Provider:      provider,
 	})
 	if err != nil {
@@ -110,7 +110,7 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 	}
 
 	// Step 4: Verify the ID token
-	claims, err := u.tokenVerifier.Verify(ctx, tokenResp.IdToken, tx.Nonce(), provider.ClientId(), provider.Issuer())
+	claims, err := u.tokenVerifier.Verify(ctx, tokenResp.IdToken, tx.Nonce(), provider.Client().Id(), provider.Issuer())
 	if err != nil {
 		return dto.CallbackOutput{}, fmt.Errorf("ID token verification failed: %w", ErrCallbackTokenVerificationFailed)
 	}
@@ -123,11 +123,11 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 
 	session := model.NewAppSession(
 		sessionId,
-		claims.Subject,
-		claims.Issuer,
-		claims.Email,
-		claims.Name,
-		claims.Picture,
+		claims.Subject(),
+		claims.Issuer(),
+		claims.Email(),
+		claims.Name(),
+		claims.Picture(),
 	)
 	if err := u.sessionRepo.Save(ctx, session, u.sessionTtl); err != nil {
 		return dto.CallbackOutput{}, fmt.Errorf("failed to save session: %w", err)

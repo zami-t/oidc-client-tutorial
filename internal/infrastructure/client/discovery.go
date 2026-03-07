@@ -8,6 +8,6 @@ import (
 
 // DiscoveryClient fetches data directly from an OpenID Provider without caching.
 type DiscoveryClient interface {
-	GetProviderMetadata(ctx context.Context, issuer string) (model.ProviderMetadata, error)
+	GetProviderMetadata(ctx context.Context, issuer model.Issuer) (model.ProviderMetadata, error)
 	GetJwks(ctx context.Context, jwksUri string) (model.JwkSet, error)
 }

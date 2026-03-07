@@ -37,13 +37,13 @@ func (c *tokenClient) Exchange(ctx context.Context, req port.TokenExchangeReques
 	switch req.Provider.AuthMethod() {
 	case model.AuthMethodBasic:
 		// RFC 6749 §2.3.1: URL-encode each credential, then Base64-encode "id:secret"
-		encodedId := url.QueryEscape(req.Provider.ClientId())
-		encodedSecret := url.QueryEscape(req.Provider.ClientSecret())
+		encodedId := url.QueryEscape(req.Provider.Client().Id())
+		encodedSecret := url.QueryEscape(req.Provider.Client().Secret())
 		credentials := base64.StdEncoding.EncodeToString([]byte(encodedId + ":" + encodedSecret))
 		authHeader = "Basic " + credentials
 	case model.AuthMethodPost:
-		formValues.Set("client_id", req.Provider.ClientId())
-		formValues.Set("client_secret", req.Provider.ClientSecret())
+		formValues.Set("client_id", req.Provider.Client().Id())
+		formValues.Set("client_secret", req.Provider.Client().Secret())
 	default:
 		return port.TokenResponse{}, fmt.Errorf("unsupported auth method: %s", req.Provider.AuthMethod())
 	}

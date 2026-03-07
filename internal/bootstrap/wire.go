@@ -65,27 +65,25 @@ func InitializeApp() (*App, error) {
 	// Providers
 	googleProvider := model.NewProvider(
 		"google",
-		"https://accounts.google.com",
-		cfg.GoogleClientId,
-		cfg.GoogleClientSecret,
-		cfg.RedirectUri,
+		model.NewIssuer("https://accounts.google.com"),
+		model.NewClient(cfg.GoogleClientId, cfg.GoogleClientSecret, model.NewRedirectUri(cfg.RedirectUri)),
 		[]string{"openid", "email", "profile"},
 		cfg.AuthMethod,
 	)
-	providers := map[string]model.Provider{
+	supportedProviders := map[string]model.Provider{
 		"google": googleProvider,
 	}
 
 	// Usecases
 	loginUC := usecase.NewLoginUsecase(
-		providers,
+		supportedProviders,
 		transactionRepo,
 		orchestrator,
 		randomGen,
 		cfg.TransactionTtl,
 	)
 	callbackUC := usecase.NewCallbackUsecase(
-		providers,
+		supportedProviders,
 		transactionRepo,
 		sessionRepo,
 		orchestrator,

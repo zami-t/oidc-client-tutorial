@@ -10,12 +10,12 @@ import (
 type DiscoveryClient interface {
 	// GetProviderMetadata returns the provider metadata for the given issuer,
 	// using the cache if available.
-	GetProviderMetadata(ctx context.Context, issuer string) (model.ProviderMetadata, error)
+	GetProviderMetadata(ctx context.Context, issuer model.Issuer) (model.ProviderMetadata, error)
 
 	// GetJwks returns the JWKS for the given issuer, using the cache if available.
-	GetJwks(ctx context.Context, issuer string) (model.JwkSet, error)
+	GetJwks(ctx context.Context, issuer model.Issuer) (model.JwkSet, error)
 
 	// RefreshJwks forces a re-fetch of JWKS from jwksUri and updates the cache.
 	// Called when an unknown kid is encountered (key rotation).
-	RefreshJwks(ctx context.Context, issuer string, jwksUri string) (model.JwkSet, error)
+	RefreshJwks(ctx context.Context, issuer model.Issuer, jwksUri string) (model.JwkSet, error)
 }

@@ -73,14 +73,15 @@ func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.L
 	}
 
 	redirectUrl := buildAuthorizationUrl(metadata.AuthorizationEndpoint(), provider, state, nonce)
+
 	return dto.LoginOutput{RedirectUrl: redirectUrl}, nil
 }
 
 func buildAuthorizationUrl(endpoint string, provider model.Provider, state, nonce string) string {
 	params := url.Values{
 		"response_type": {"code"},
-		"client_id":     {provider.ClientId()},
-		"redirect_uri":  {provider.RedirectUri()},
+		"client_id":     {provider.Client().Id()},
+		"redirect_uri":  {provider.Client().RedirectUri().String()},
 		"scope":         {strings.Join(provider.Scopes(), " ")},
 		"state":         {state},
 		"nonce":         {nonce},

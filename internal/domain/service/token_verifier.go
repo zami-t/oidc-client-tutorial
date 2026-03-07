@@ -58,7 +58,7 @@ func (v *IdTokenVerifier) Verify(
 	rawToken string,
 	expectedNonce string,
 	expectedClientId string,
-	expectedIssuer string,
+	expectedIssuer model.Issuer,
 ) (model.IdTokenClaims, error) {
 	parts := strings.Split(rawToken, ".")
 	if len(parts) != 3 {
@@ -129,18 +129,18 @@ func (v *IdTokenVerifier) Verify(
 		return model.IdTokenClaims{}, fmt.Errorf("failed to parse aud claim: %w", err)
 	}
 
-	claims := model.IdTokenClaims{
-		Issuer:          rawClaims.Iss,
-		Subject:         rawClaims.Sub,
-		Audience:        audience,
-		AuthorizedParty: rawClaims.Azp,
-		ExpiresAt:       rawClaims.Exp,
-		IssuedAt:        rawClaims.Iat,
-		Nonce:           rawClaims.Nonce,
-		Email:           rawClaims.Email,
-		Name:            rawClaims.Name,
-		Picture:         rawClaims.Picture,
-	}
+	claims := model.NewIdTokenClaims(
+		rawClaims.Iss,
+		rawClaims.Sub,
+		audience,
+		rawClaims.Azp,
+		rawClaims.Exp,
+		rawClaims.Iat,
+		rawClaims.Nonce,
+		rawClaims.Email,
+		rawClaims.Name,
+		rawClaims.Picture,
+	)
 
 	// Step 4.4: Validate all claims
 	if err := validateClaims(claims, expectedNonce, expectedClientId, expectedIssuer); err != nil {
@@ -160,20 +160,20 @@ func verifyRS256(jwk model.Jwk, signingInput string, signature []byte) error {
 }
 
 // validateClaims validates all required ID token claims per OIDC Core 3.1.3.7 and google-idp.md.
-func validateClaims(claims model.IdTokenClaims, expectedNonce, expectedClientId, expectedIssuer string) error {
+func validateClaims(claims model.IdTokenClaims, expectedNonce, expectedClientId string, expectedIssuer model.Issuer) error {
 	now := time.Now()
 
 	// iss: must match issuer from discovery (accept both https://issuer and issuer)
-	if claims.Issuer != expectedIssuer {
-		altIssuer := strings.TrimPrefix(expectedIssuer, "https://")
-		if claims.Issuer != altIssuer {
-			return fmt.Errorf("iss mismatch: got %q, expected %q", claims.Issuer, expectedIssuer)
+	if claims.Issuer() != expectedIssuer.String() {
+		altIssuer := strings.TrimPrefix(expectedIssuer.String(), "https://")
+		if claims.Issuer() != altIssuer {
+			return fmt.Errorf("iss mismatch: got %q, expected %q", claims.Issuer(), expectedIssuer)
 		}
 	}
 
 	// aud: must contain client_id
 	audContainsClientId := false
-	for _, a := range claims.Audience {
+	for _, a := range claims.Audience() {
 		if a == expectedClientId {
 			audContainsClientId = true
 			break
@@ -184,29 +184,29 @@ func validateClaims(claims model.IdTokenClaims, expectedNonce, expectedClientId,
 	}
 
 	// azp: if aud has multiple values, azp must equal client_id
-	if len(claims.Audience) > 1 && claims.AuthorizedParty != expectedClientId {
-		return fmt.Errorf("azp mismatch: got %q, expected %q", claims.AuthorizedParty, expectedClientId)
+	if len(claims.Audience()) > 1 && claims.AuthorizedParty() != expectedClientId {
+		return fmt.Errorf("azp mismatch: got %q, expected %q", claims.AuthorizedParty(), expectedClientId)
 	}
 
 	// exp: must not be in the past (allow 5-minute clock skew)
 	const clockSkew = 5 * time.Minute
-	if time.Unix(claims.ExpiresAt, 0).Add(clockSkew).Before(now) {
-		return fmt.Errorf("ID token has expired (exp=%d)", claims.ExpiresAt)
+	if time.Unix(claims.ExpiresAt(), 0).Add(clockSkew).Before(now) {
+		return fmt.Errorf("ID token has expired (exp=%d)", claims.ExpiresAt())
 	}
 
 	// iat: reject tokens issued more than 10 minutes ago (RP policy)
 	const maxAge = 10 * time.Minute
-	if time.Unix(claims.IssuedAt, 0).Add(maxAge).Before(now) {
-		return fmt.Errorf("ID token is too old (iat=%d)", claims.IssuedAt)
+	if time.Unix(claims.IssuedAt(), 0).Add(maxAge).Before(now) {
+		return fmt.Errorf("ID token is too old (iat=%d)", claims.IssuedAt())
 	}
 
 	// nonce: must match the value stored in the transaction
-	if claims.Nonce != expectedNonce {
+	if claims.Nonce() != expectedNonce {
 		return fmt.Errorf("nonce mismatch")
 	}
 
 	// sub: must be present
-	if claims.Subject == "" {
+	if claims.Subject() == "" {
 		return fmt.Errorf("sub claim is empty")
 	}
 

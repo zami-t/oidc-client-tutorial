@@ -1,16 +1,15 @@
 package model
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
 	"math/big"
-
-	"crypto/rsa"
 )
 
 // ProviderMetadata holds OpenID Provider metadata from the discovery endpoint.
 type ProviderMetadata struct {
-	issuer                           string
+	issuer                           Issuer
 	authorizationEndpoint            string
 	tokenEndpoint                    string
 	userinfoEndpoint                 string
@@ -22,7 +21,7 @@ type ProviderMetadata struct {
 
 // NewProviderMetadata creates a new ProviderMetadata.
 func NewProviderMetadata(
-	issuer,
+	issuer Issuer,
 	authorizationEndpoint,
 	tokenEndpoint,
 	userinfoEndpoint,
@@ -43,13 +42,13 @@ func NewProviderMetadata(
 	}
 }
 
-func (m ProviderMetadata) Issuer() string                             { return m.issuer }
-func (m ProviderMetadata) AuthorizationEndpoint() string              { return m.authorizationEndpoint }
-func (m ProviderMetadata) TokenEndpoint() string                      { return m.tokenEndpoint }
-func (m ProviderMetadata) UserinfoEndpoint() string                   { return m.userinfoEndpoint }
-func (m ProviderMetadata) JwksUri() string                            { return m.jwksUri }
-func (m ProviderMetadata) ResponseTypesSupported() []string           { return m.responseTypesSupported }
-func (m ProviderMetadata) SubjectTypesSupported() []string            { return m.subjectTypesSupported }
+func (m ProviderMetadata) Issuer() Issuer                   { return m.issuer }
+func (m ProviderMetadata) AuthorizationEndpoint() string    { return m.authorizationEndpoint }
+func (m ProviderMetadata) TokenEndpoint() string            { return m.tokenEndpoint }
+func (m ProviderMetadata) UserinfoEndpoint() string         { return m.userinfoEndpoint }
+func (m ProviderMetadata) JwksUri() string                  { return m.jwksUri }
+func (m ProviderMetadata) ResponseTypesSupported() []string { return m.responseTypesSupported }
+func (m ProviderMetadata) SubjectTypesSupported() []string  { return m.subjectTypesSupported }
 func (m ProviderMetadata) IdTokenSigningAlgValuesSupported() []string {
 	return m.idTokenSigningAlgValuesSupported
 }

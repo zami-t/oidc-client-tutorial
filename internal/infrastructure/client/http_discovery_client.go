@@ -22,8 +22,8 @@ func NewHttpDiscoveryClient(timeout time.Duration) DiscoveryClient {
 	}
 }
 
-func (c *httpDiscoveryClient) GetProviderMetadata(ctx context.Context, issuer string) (model.ProviderMetadata, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+func (c *httpDiscoveryClient) GetProviderMetadata(ctx context.Context, issuer model.Issuer) (model.ProviderMetadata, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer.String()+"/.well-known/openid-configuration", nil)
 	if err != nil {
 		return model.ProviderMetadata{}, fmt.Errorf("failed to create discovery request: %w", err)
 	}
@@ -41,7 +41,7 @@ func (c *httpDiscoveryClient) GetProviderMetadata(ctx context.Context, issuer st
 		return model.ProviderMetadata{}, fmt.Errorf("failed to decode provider metadata: %w", err)
 	}
 	return model.NewProviderMetadata(
-		raw.Issuer,
+		model.Issuer(raw.Issuer),
 		raw.AuthorizationEndpoint,
 		raw.TokenEndpoint,
 		raw.UserinfoEndpoint,
