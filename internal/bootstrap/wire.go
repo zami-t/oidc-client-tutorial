@@ -151,7 +151,13 @@ func loadConfig() (*Config, error) {
 		transactionTtl = time.Duration(minutes) * time.Minute
 	}
 
-	secureCookie := os.Getenv("SECURE_COOKIE") != "false"
+	secureCookie := false
+	if v := os.Getenv("SECURE_COOKIE"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err == nil {
+			secureCookie = parsed
+		}
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
