@@ -13,6 +13,7 @@ import (
 	"oidc-tutorial/internal/domain/service"
 	infraClient "oidc-tutorial/internal/infrastructure/client"
 	"oidc-tutorial/internal/infrastructure/repository"
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/presentation/handler"
 	"oidc-tutorial/internal/usecase"
 )
@@ -20,6 +21,7 @@ import (
 // Config holds application configuration loaded from environment variables.
 type Config struct {
 	Port                    string
+	Version                 string
 	GoogleClientId          string
 	GoogleClientSecret      string
 	RedirectUri             string
@@ -42,6 +44,8 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
+
+	log := logger.New("oidc-client", cfg.Version)
 
 	// Infrastructure
 	redisClient := redis.NewClient(&redis.Options{
@@ -97,10 +101,10 @@ func InitializeApp() (*App, error) {
 
 	// Handlers
 	sameSite := http.SameSiteLaxMode
-	loginH := handler.NewLoginHandler(loginUC)
-	callbackH := handler.NewCallbackHandler(callbackUC, sameSite, cfg.SecureCookie)
-	logoutH := handler.NewLogoutHandler(logoutUC, sameSite, cfg.SecureCookie)
-	meH := handler.NewMeHandler(meUC)
+	loginH := handler.NewLoginHandler(loginUC, log)
+	callbackH := handler.NewCallbackHandler(callbackUC, sameSite, cfg.SecureCookie, log)
+	logoutH := handler.NewLogoutHandler(logoutUC, sameSite, cfg.SecureCookie, log)
+	meH := handler.NewMeHandler(meUC, log)
 	healthH := &handler.HealthHandler{}
 
 	// Router (Go 1.22+ method+path routing)
@@ -111,10 +115,16 @@ func InitializeApp() (*App, error) {
 	mux.Handle("GET /me", meH)
 	mux.Handle("GET /health", healthH)
 
-	return &App{Router: mux}, nil
+	trace := handler.NewTraceMiddleware(log)
+	return &App{Router: trace(mux)}, nil
 }
 
 func loadConfig() (*Config, error) {
+	version := os.Getenv("VERSION")
+	if version == "" {
+		version = "unknown"
+	}
+
 	clientId := os.Getenv("GOOGLE_CLIENT_ID")
 	if clientId == "" {
 		return nil, fmt.Errorf("GOOGLE_CLIENT_ID is required")
@@ -180,6 +190,7 @@ func loadConfig() (*Config, error) {
 
 	return &Config{
 		Port:                    port,
+		Version:                 version,
 		GoogleClientId:          clientId,
 		GoogleClientSecret:      clientSecret,
 		RedirectUri:             redirectUri,

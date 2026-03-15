@@ -11,6 +11,7 @@ import (
 
 	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/domain/service"
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/presentation/handler"
 	"oidc-tutorial/internal/usecase"
 )
@@ -71,6 +72,10 @@ func buildHandlerLoginUsecase(txRepo *handlerStubTransactionRepo, discovery *han
 	)
 }
 
+func testLogger() *logger.Logger {
+	return logger.New("test", "test")
+}
+
 func buildHandlerStubMetadata() model.ProviderMetadata {
 	return model.NewProviderMetadata(
 		model.NewIssuer("https://accounts.google.com"),
@@ -90,7 +95,7 @@ func TestLoginHandler_ValidIdp_Redirects(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{}
 	discovery := &handlerStubDiscoveryClient{metadata: buildHandlerStubMetadata()}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
 	rec := httptest.NewRecorder()
@@ -128,7 +133,7 @@ func TestLoginHandler_UnknownIdp_Returns400(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{}
 	discovery := &handlerStubDiscoveryClient{metadata: buildHandlerStubMetadata()}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/login?idp=unknown", nil)
 	rec := httptest.NewRecorder()
@@ -143,7 +148,7 @@ func TestLoginHandler_MissingIdp_Returns400(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{}
 	discovery := &handlerStubDiscoveryClient{metadata: buildHandlerStubMetadata()}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	// no idp query param → empty string → unknown IdP
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
@@ -159,7 +164,7 @@ func TestLoginHandler_DiscoveryError_Returns500(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{}
 	discovery := &handlerStubDiscoveryClient{err: errors.New("discovery unavailable")}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
 	rec := httptest.NewRecorder()
@@ -174,7 +179,7 @@ func TestLoginHandler_TransactionSaveError_Returns500(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{saveErr: errors.New("redis unavailable")}
 	discovery := &handlerStubDiscoveryClient{metadata: buildHandlerStubMetadata()}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
 	rec := httptest.NewRecorder()
@@ -190,7 +195,7 @@ func TestLoginHandler_ReturnTo_NotIncludedInRedirectUrl(t *testing.T) {
 	txRepo := &handlerStubTransactionRepo{}
 	discovery := &handlerStubDiscoveryClient{metadata: buildHandlerStubMetadata()}
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
-	h := handler.NewLoginHandler(uc)
+	h := handler.NewLoginHandler(uc, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=/dashboard", nil)
 	rec := httptest.NewRecorder()
