@@ -69,6 +69,7 @@ func buildHandlerLoginUsecase(txRepo *handlerStubTransactionRepo, discovery *han
 		discovery,
 		service.RandomGenerator{},
 		10*time.Minute,
+		logger.New("test", "test"),
 	)
 }
 

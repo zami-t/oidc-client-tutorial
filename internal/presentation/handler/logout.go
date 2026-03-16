@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/logger"
@@ -31,11 +30,6 @@ func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Execute(ctx, ucDto.LogoutInput{SessionId: cookie.Value}); err != nil {
-		if errors.Is(err, usecase.ErrLogoutSessionNotFound) {
-			h.log.Warn(ctx, "logout failed", err)
-		} else {
-			h.log.Error(ctx, "logout failed", "LOGOUT_FAILED", err)
-		}
 		writeError(w, err)
 		return
 	}

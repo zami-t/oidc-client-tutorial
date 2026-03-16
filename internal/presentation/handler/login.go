@@ -28,7 +28,6 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.usecase.Execute(ctx, input)
 	if err != nil {
-		h.log.Warn(ctx, "login failed", err)
 		writeError(w, err)
 		return
 	}

@@ -85,6 +85,7 @@ func InitializeApp() (*App, error) {
 		orchestrator,
 		randomGen,
 		cfg.TransactionTtl,
+		log,
 	)
 	callbackUC := usecase.NewCallbackUsecase(
 		supportedProviders,
@@ -95,16 +96,17 @@ func InitializeApp() (*App, error) {
 		tokenVerifier,
 		randomGen,
 		cfg.SessionTtl,
+		log,
 	)
-	logoutUC := usecase.NewLogoutUsecase(sessionRepo)
-	meUC := usecase.NewMeUsecase(sessionRepo)
+	logoutUC := usecase.NewLogoutUsecase(sessionRepo, log)
+	meUC := usecase.NewMeUsecase(sessionRepo, log)
 
 	// Handlers
 	sameSite := http.SameSiteLaxMode
 	loginH := handler.NewLoginHandler(loginUC, log)
 	callbackH := handler.NewCallbackHandler(callbackUC, sameSite, cfg.SecureCookie, log)
 	logoutH := handler.NewLogoutHandler(logoutUC, sameSite, cfg.SecureCookie, log)
-	meH := handler.NewMeHandler(meUC, log)
+	meH := handler.NewMeHandler(meUC)
 	healthH := &handler.HealthHandler{}
 
 	// Router (Go 1.22+ method+path routing)

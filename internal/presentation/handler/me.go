@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 
-	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/usecase"
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
@@ -11,12 +10,11 @@ import (
 // MeHandler handles GET /me.
 type MeHandler struct {
 	usecase *usecase.MeUsecase
-	log     *logger.Logger
 }
 
 // NewMeHandler creates a new MeHandler.
-func NewMeHandler(uc *usecase.MeUsecase, log *logger.Logger) *MeHandler {
-	return &MeHandler{usecase: uc, log: log}
+func NewMeHandler(uc *usecase.MeUsecase) *MeHandler {
+	return &MeHandler{usecase: uc}
 }
 
 func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +27,6 @@ func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.usecase.Execute(ctx, ucDto.MeInput{SessionId: cookie.Value})
 	if err != nil {
-		h.log.Error(ctx, "me: session lookup failed", "SESSION_LOOKUP_FAILED", err)
 		writeError(w, err)
 		return
 	}

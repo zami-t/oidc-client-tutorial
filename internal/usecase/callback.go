@@ -10,6 +10,7 @@ import (
 	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/domain/port"
 	"oidc-tutorial/internal/domain/service"
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/usecase/dto"
 )
 
@@ -31,6 +32,7 @@ type CallbackUsecase struct {
 	tokenVerifier   *service.IdTokenVerifier
 	randomGen       service.RandomGenerator
 	sessionTtl      time.Duration
+	log             *logger.Logger
 }
 
 // NewCallbackUsecase creates a new CallbackUsecase.
@@ -43,6 +45,7 @@ func NewCallbackUsecase(
 	tokenVerifier *service.IdTokenVerifier,
 	randomGen service.RandomGenerator,
 	sessionTtl time.Duration,
+	log *logger.Logger,
 ) *CallbackUsecase {
 	return &CallbackUsecase{
 		providers:       providers,
@@ -53,6 +56,7 @@ func NewCallbackUsecase(
 		tokenVerifier:   tokenVerifier,
 		randomGen:       randomGen,
 		sessionTtl:      sessionTtl,
+		log:             log,
 	}
 }
 
@@ -60,37 +64,55 @@ func NewCallbackUsecase(
 func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) (dto.CallbackOutput, error) {
 	// Step 3.1: Handle OP-side authorization errors
 	if input.Error != "" {
-		return dto.CallbackOutput{}, fmt.Errorf("OP returned %q: %w", input.Error, ErrCallbackAuthorizationError)
+		err := fmt.Errorf("OP returned %q: %w", input.Error, ErrCallbackAuthorizationError)
+		u.log.Info(ctx, "callback: authorization error from OP")
+		return dto.CallbackOutput{}, err
 	}
 	if input.State == "" {
-		return dto.CallbackOutput{}, fmt.Errorf("state parameter missing: %w", ErrCallbackStateMismatch)
+		err := fmt.Errorf("state parameter missing: %w", ErrCallbackStateMismatch)
+		u.log.Info(ctx, "callback: state parameter missing")
+		return dto.CallbackOutput{}, err
 	}
 	if input.Code == "" {
-		return dto.CallbackOutput{}, fmt.Errorf("code parameter missing: %w", ErrCallbackStateMismatch)
+		err := fmt.Errorf("code parameter missing: %w", ErrCallbackStateMismatch)
+		u.log.Info(ctx, "callback: code parameter missing")
+		return dto.CallbackOutput{}, err
 	}
 
 	// Look up the transaction by state (validates CSRF)
 	tx, err := u.transactionRepo.FindByState(ctx, input.State)
 	if err != nil {
 		if errors.Is(err, port.ErrTransactionNotFound) {
-			return dto.CallbackOutput{}, fmt.Errorf("state not found or expired: %w", ErrCallbackStateMismatch)
+			wrapped := fmt.Errorf("state not found or expired: %w", ErrCallbackStateMismatch)
+			u.log.Warn(ctx, "callback: state not found or expired", wrapped)
+			return dto.CallbackOutput{}, wrapped
 		}
-		return dto.CallbackOutput{}, fmt.Errorf("failed to lookup transaction: %w", err)
+		wrapped := fmt.Errorf("failed to lookup transaction: %w", err)
+		u.log.Error(ctx, "callback: failed to lookup transaction", "CALLBACK_TRANSACTION_LOOKUP_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
 
 	// Delete the transaction immediately — one-time use (replay prevention)
 	if err := u.transactionRepo.Delete(ctx, input.State); err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("failed to delete transaction: %w", err)
+		wrapped := fmt.Errorf("failed to delete transaction: %w", err)
+		u.log.Error(ctx, "callback: failed to delete transaction", "CALLBACK_TRANSACTION_DELETE_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
+
+	u.log.Info(ctx, "callback: state validated")
 
 	provider, ok := u.providers[tx.Idp()]
 	if !ok {
-		return dto.CallbackOutput{}, fmt.Errorf("unknown IdP %q in transaction", tx.Idp())
+		err := fmt.Errorf("unknown IdP %q in transaction", tx.Idp())
+		u.log.Error(ctx, "callback: unknown idp in transaction", "CALLBACK_UNKNOWN_IDP", err)
+		return dto.CallbackOutput{}, err
 	}
 
 	metadata, err := u.discoveryClient.GetProviderMetadata(ctx, provider.Issuer())
 	if err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("failed to get provider metadata: %w", err)
+		wrapped := fmt.Errorf("failed to get provider metadata: %w", err)
+		u.log.Error(ctx, "callback: failed to get provider metadata", "CALLBACK_DISCOVERY_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
 
 	// Step 3.2: Exchange authorization code for tokens
@@ -101,24 +123,36 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 		Provider:      provider,
 	})
 	if err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("token exchange failed: %w", ErrCallbackTokenVerificationFailed)
+		wrapped := fmt.Errorf("token exchange failed: %w", ErrCallbackTokenVerificationFailed)
+		u.log.Error(ctx, "callback: token exchange failed", "CALLBACK_TOKEN_EXCHANGE_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
 
 	// Validate token_type (RFC 6750)
 	if !strings.EqualFold(tokenResp.TokenType, "Bearer") {
-		return dto.CallbackOutput{}, fmt.Errorf("unsupported token type %q: %w", tokenResp.TokenType, ErrCallbackTokenVerificationFailed)
+		wrapped := fmt.Errorf("unsupported token type %q: %w", tokenResp.TokenType, ErrCallbackTokenVerificationFailed)
+		u.log.Error(ctx, "callback: unsupported token type", "CALLBACK_TOKEN_EXCHANGE_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
+
+	u.log.Info(ctx, "callback: token exchanged")
 
 	// Step 4: Verify the ID token
 	claims, err := u.tokenVerifier.Verify(ctx, tokenResp.IdToken, tx.Nonce(), provider.Client().Id(), provider.Issuer())
 	if err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("ID token verification failed: %w", ErrCallbackTokenVerificationFailed)
+		wrapped := fmt.Errorf("ID token verification failed: %w", ErrCallbackTokenVerificationFailed)
+		u.log.Error(ctx, "callback: id token verification failed", "CALLBACK_TOKEN_VERIFY_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
+
+	u.log.Info(ctx, "callback: id token verified")
 
 	// Create session
 	sessionId, err := u.randomGen.Generate(32) // 256 bits
 	if err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("failed to generate session ID: %w", err)
+		wrapped := fmt.Errorf("failed to generate session ID: %w", err)
+		u.log.Error(ctx, "callback: failed to generate session id", "CALLBACK_SESSION_CREATE_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
 
 	session := model.NewAppSession(
@@ -130,8 +164,12 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 		claims.Picture(),
 	)
 	if err := u.sessionRepo.Save(ctx, session, u.sessionTtl); err != nil {
-		return dto.CallbackOutput{}, fmt.Errorf("failed to save session: %w", err)
+		wrapped := fmt.Errorf("failed to save session: %w", err)
+		u.log.Error(ctx, "callback: failed to save session", "CALLBACK_SESSION_CREATE_FAILED", wrapped)
+		return dto.CallbackOutput{}, wrapped
 	}
+
+	u.log.Info(ctx, "callback: session created")
 
 	return dto.CallbackOutput{
 		ReturnTo:  tx.ReturnTo(),

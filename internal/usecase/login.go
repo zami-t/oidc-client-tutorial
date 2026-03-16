@@ -11,6 +11,7 @@ import (
 	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/domain/port"
 	"oidc-tutorial/internal/domain/service"
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/usecase/dto"
 )
 
@@ -27,6 +28,7 @@ type LoginUsecase struct {
 	discoveryClient port.DiscoveryClient
 	randomGen       service.RandomGenerator
 	transactionTtl  time.Duration
+	log             *logger.Logger
 }
 
 // NewLoginUsecase creates a new LoginUsecase.
@@ -36,6 +38,7 @@ func NewLoginUsecase(
 	discoveryClient port.DiscoveryClient,
 	randomGen service.RandomGenerator,
 	transactionTtl time.Duration,
+	log *logger.Logger,
 ) *LoginUsecase {
 	return &LoginUsecase{
 		providers:       providers,
@@ -43,6 +46,7 @@ func NewLoginUsecase(
 		discoveryClient: discoveryClient,
 		randomGen:       randomGen,
 		transactionTtl:  transactionTtl,
+		log:             log,
 	}
 }
 
@@ -50,30 +54,40 @@ func NewLoginUsecase(
 func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.LoginOutput, error) {
 	provider, ok := u.providers[input.Idp]
 	if !ok {
-		return dto.LoginOutput{}, fmt.Errorf("idp %q: %w", input.Idp, ErrLoginUnknownIdp)
+		err := fmt.Errorf("idp %q: %w", input.Idp, ErrLoginUnknownIdp)
+		u.log.Info(ctx, "login: unknown idp requested")
+		return dto.LoginOutput{}, err
 	}
 
 	metadata, err := u.discoveryClient.GetProviderMetadata(ctx, provider.Issuer())
 	if err != nil {
-		return dto.LoginOutput{}, fmt.Errorf("failed to get provider metadata: %w", err)
+		wrapped := fmt.Errorf("failed to get provider metadata: %w", err)
+		u.log.Error(ctx, "login: failed to get provider metadata", "LOGIN_DISCOVERY_FAILED", wrapped)
+		return dto.LoginOutput{}, wrapped
 	}
 
 	state, err := u.randomGen.Generate(32) // 256 bits
 	if err != nil {
-		return dto.LoginOutput{}, fmt.Errorf("failed to generate state: %w", err)
+		wrapped := fmt.Errorf("failed to generate state: %w", err)
+		u.log.Error(ctx, "login: failed to generate state", "LOGIN_RANDOM_FAILED", wrapped)
+		return dto.LoginOutput{}, wrapped
 	}
 	nonce, err := u.randomGen.Generate(32) // 256 bits
 	if err != nil {
-		return dto.LoginOutput{}, fmt.Errorf("failed to generate nonce: %w", err)
+		wrapped := fmt.Errorf("failed to generate nonce: %w", err)
+		u.log.Error(ctx, "login: failed to generate nonce", "LOGIN_RANDOM_FAILED", wrapped)
+		return dto.LoginOutput{}, wrapped
 	}
 
 	tx := model.NewAuthorizationTransaction(state, nonce, input.ReturnTo, input.Idp)
 	if err := u.transactionRepo.Save(ctx, tx, u.transactionTtl); err != nil {
-		return dto.LoginOutput{}, fmt.Errorf("failed to save transaction: %w", err)
+		wrapped := fmt.Errorf("failed to save transaction: %w", err)
+		u.log.Error(ctx, "login: failed to save transaction", "LOGIN_TRANSACTION_SAVE_FAILED", wrapped)
+		return dto.LoginOutput{}, wrapped
 	}
 
+	u.log.Info(ctx, "login: transaction saved")
 	redirectUrl := buildAuthorizationUrl(metadata.AuthorizationEndpoint(), provider, state, nonce)
-
 	return dto.LoginOutput{RedirectUrl: redirectUrl}, nil
 }
 

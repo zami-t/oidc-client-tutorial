@@ -9,6 +9,7 @@ import (
 
 	"oidc-tutorial/internal/domain/model"
 	"oidc-tutorial/internal/domain/service"
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/usecase"
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
@@ -68,6 +69,7 @@ func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClie
 		discovery,
 		service.RandomGenerator{},
 		10*time.Minute,
+		logger.New("test", "test"),
 	)
 }
 

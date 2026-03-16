@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/logger"
@@ -34,13 +33,6 @@ func (h *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.usecase.Execute(ctx, input)
 	if err != nil {
-		switch {
-		case errors.Is(err, usecase.ErrCallbackAuthorizationError),
-			errors.Is(err, usecase.ErrCallbackStateMismatch):
-			h.log.Warn(ctx, "callback failed", err)
-		default:
-			h.log.Error(ctx, "callback failed", "CALLBACK_FAILED", err)
-		}
 		writeError(w, err)
 		return
 	}
