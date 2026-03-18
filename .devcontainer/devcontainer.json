@@ -22,7 +22,8 @@
 				"bierner.markdown-mermaid",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"42crunch.vscode-openapi"
 			],
 			"settings": {
 				"editor.formatOnSave": true,
