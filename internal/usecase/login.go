@@ -23,7 +23,6 @@ var (
 // LoginUsecase orchestrates the /login endpoint: generates state/nonce,
 // stores the transaction, and builds the OP authorization URL.
 type LoginUsecase struct {
-	providers       map[string]model.Provider
 	transactionRepo port.TransactionRepository
 	discoveryClient port.DiscoveryClient
 	randomGen       service.RandomGenerator
@@ -33,7 +32,6 @@ type LoginUsecase struct {
 
 // NewLoginUsecase creates a new LoginUsecase.
 func NewLoginUsecase(
-	providers map[string]model.Provider,
 	transactionRepo port.TransactionRepository,
 	discoveryClient port.DiscoveryClient,
 	randomGen service.RandomGenerator,
@@ -41,7 +39,6 @@ func NewLoginUsecase(
 	log *logger.Logger,
 ) *LoginUsecase {
 	return &LoginUsecase{
-		providers:       providers,
 		transactionRepo: transactionRepo,
 		discoveryClient: discoveryClient,
 		randomGen:       randomGen,
@@ -52,7 +49,7 @@ func NewLoginUsecase(
 
 // Execute starts the authorization flow and returns the redirect URL.
 func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.LoginOutput, error) {
-	provider, ok := u.providers[input.Idp]
+	provider, ok := model.Registry.Get(input.Idp)
 	if !ok {
 		err := fmt.Errorf("idp %q: %w", input.Idp, ErrLoginUnknownIdp)
 		u.log.Info(ctx, "login: unknown idp requested")

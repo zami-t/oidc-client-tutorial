@@ -24,7 +24,6 @@ var (
 // CallbackUsecase handles the /callback endpoint: validates state, exchanges the
 // authorization code for tokens, verifies the ID token, and creates a session.
 type CallbackUsecase struct {
-	providers       map[string]model.Provider
 	transactionRepo port.TransactionRepository
 	sessionRepo     port.SessionRepository
 	discoveryClient port.DiscoveryClient
@@ -37,7 +36,6 @@ type CallbackUsecase struct {
 
 // NewCallbackUsecase creates a new CallbackUsecase.
 func NewCallbackUsecase(
-	providers map[string]model.Provider,
 	transactionRepo port.TransactionRepository,
 	sessionRepo port.SessionRepository,
 	discoveryClient port.DiscoveryClient,
@@ -48,7 +46,6 @@ func NewCallbackUsecase(
 	log *logger.Logger,
 ) *CallbackUsecase {
 	return &CallbackUsecase{
-		providers:       providers,
 		transactionRepo: transactionRepo,
 		sessionRepo:     sessionRepo,
 		discoveryClient: discoveryClient,
@@ -101,7 +98,7 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 
 	u.log.Info(ctx, "callback: state validated")
 
-	provider, ok := u.providers[tx.Idp()]
+	provider, ok := model.Registry.Get(tx.Idp())
 	if !ok {
 		err := fmt.Errorf("unknown IdP %q in transaction", tx.Idp())
 		u.log.Error(ctx, "callback: unknown idp in transaction", "CALLBACK_UNKNOWN_IDP", err)

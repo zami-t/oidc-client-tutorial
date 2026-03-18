@@ -66,21 +66,19 @@ func InitializeApp() (*App, error) {
 	randomGen := service.RandomGenerator{}
 	tokenVerifier := service.NewIdTokenVerifier(orchestrator)
 
-	// Providers
-	googleProvider := model.NewProvider(
-		"google",
-		model.NewIssuer("https://accounts.google.com"),
-		model.NewClient(cfg.GoogleClientId, cfg.GoogleClientSecret, model.NewRedirectUri(cfg.RedirectUri)),
-		[]string{"openid", "email", "profile"},
-		cfg.AuthMethod,
-	)
-	supportedProviders := map[string]model.Provider{
-		"google": googleProvider,
+	// Providers — RP-global registry of supported identity providers
+	model.Registry = model.ProviderRegistry{
+		"google": model.NewProvider(
+			"google",
+			model.NewIssuer("https://accounts.google.com"),
+			model.NewClient(cfg.GoogleClientId, cfg.GoogleClientSecret, model.NewRedirectUri(cfg.RedirectUri)),
+			[]string{"openid", "email", "profile"},
+			cfg.AuthMethod,
+		),
 	}
 
 	// Usecases
 	loginUC := usecase.NewLoginUsecase(
-		supportedProviders,
 		transactionRepo,
 		orchestrator,
 		randomGen,
@@ -88,7 +86,6 @@ func InitializeApp() (*App, error) {
 		log,
 	)
 	callbackUC := usecase.NewCallbackUsecase(
-		supportedProviders,
 		transactionRepo,
 		sessionRepo,
 		orchestrator,

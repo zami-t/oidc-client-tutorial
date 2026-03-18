@@ -54,7 +54,7 @@ func (s *stubDiscoveryClient) RefreshJwks(_ context.Context, _ model.Issuer, _ s
 // --- helpers ---
 
 func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClient) *usecase.LoginUsecase {
-	providers := map[string]model.Provider{
+	model.Registry = model.ProviderRegistry{
 		"google": model.NewProvider(
 			"google",
 			model.NewIssuer("https://accounts.google.com"),
@@ -64,7 +64,6 @@ func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClie
 		),
 	}
 	return usecase.NewLoginUsecase(
-		providers,
 		txRepo,
 		discovery,
 		service.RandomGenerator{},

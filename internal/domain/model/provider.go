@@ -42,3 +42,16 @@ func (p Provider) Issuer() Issuer         { return p.issuer }
 func (p Provider) Client() Client         { return p.client }
 func (p Provider) Scopes() []string       { return p.scopes }
 func (p Provider) AuthMethod() AuthMethod { return p.authMethod }
+
+// ProviderRegistry is the RP-global registry of identity providers this application supports.
+type ProviderRegistry map[string]Provider
+
+// Get returns the Provider for the given id. ok is false if not found.
+func (r ProviderRegistry) Get(id string) (Provider, bool) {
+	p, ok := r[id]
+	return p, ok
+}
+
+// Registry is the application-wide registry of supported identity providers.
+// It must be initialized once at application startup before handling requests.
+var Registry ProviderRegistry
