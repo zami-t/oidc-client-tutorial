@@ -121,18 +121,28 @@ var (
 )
 ```
 
-### Presentation 層は `errors.Is` でエラーを検出する
+### Presentation 層はハンドラーごとに `errors.Is` でエラーを検出する
+
+エラーハンドリングは **各ハンドラーファイル内に記述する**。
 
 ```go
-// presentation/handler/helpers.go
-switch {
-case errors.Is(err, usecase.ErrCallbackStateMismatch),
-    errors.Is(err, usecase.ErrCallbackAuthorizationError):
-    writeJson(w, http.StatusForbidden, ...)
-case errors.Is(err, usecase.ErrMeSessionNotFound):
-    writeJson(w, http.StatusUnauthorized, ...)
-default:
-    writeJson(w, http.StatusInternalServerError, ...)
+// presentation/handler/callback.go
+if err != nil {
+    switch {
+    case errors.Is(err, usecase.ErrCallbackAuthorizationError):
+        writeJson(w, http.StatusForbidden, errorResponse{
+            ErrorDetailCode: "AUTHORIZATION_ERROR",
+            Message:         "authorization error from identity provider",
+        })
+    case errors.Is(err, usecase.ErrCallbackStateMismatch):
+        writeJson(w, http.StatusForbidden, errorResponse{
+            ErrorDetailCode: "STATE_MISMATCH",
+            Message:         "state validation failed",
+        })
+    default:
+        writeServerError(w)
+    }
+    return
 }
 ```
 

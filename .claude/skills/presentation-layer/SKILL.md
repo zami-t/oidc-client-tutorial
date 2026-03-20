@@ -32,9 +32,14 @@ internal/presentation/
 ## handler/ - HTTP Handler
 
 **責務**
+
 - HTTP リクエストを受け取り、Usecase の DTO に変換する
 - Usecase を呼び出し、結果を HTTP レスポンスとして返す
 - `errors.Is` で usecase.ErrXxx を検出し、適切なHTTPステータスにマッピングする
+
+**エラーハンドリングの規則**
+
+- エラーハンドリングは**各ハンドラーファイル内に直接記述する**
 
 **パターン例**
 
@@ -43,6 +48,7 @@ package handler
 
 import (
     "encoding/json"
+    "errors"
     "net/http"
     "example.com/project/internal/usecase"
     usecaseDTO "example.com/project/internal/usecase/dto"
@@ -74,7 +80,21 @@ func (h *UserRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
     // 3. Usecase の実行
     output, err := h.usecase.Execute(r.Context(), input)
     if err != nil {
-        writeError(w, err)
+        // このハンドラーが呼ぶユースケースのエラーだけをここで処理する
+        switch {
+        case errors.Is(err, usecase.ErrUserRegistrationEmailDuplicate):
+            writeJson(w, http.StatusConflict, errorResponse{
+                ErrorDetailCode: "EMAIL_DUPLICATE",
+                Message:         "email already registered",
+            })
+        case errors.Is(err, usecase.ErrUserRegistrationInvalidInput):
+            writeJson(w, http.StatusBadRequest, errorResponse{
+                ErrorDetailCode: "INVALID_INPUT",
+                Message:         "invalid request",
+            })
+        default:
+            writeServerError(w)
+        }
         return
     }
 
@@ -83,21 +103,7 @@ func (h *UserRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
         UserID: output.UserID,
         Email:  output.Email,
     }
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(resp)
-}
-
-// エラーを errors.Is で検出し HTTP ステータスにマッピングする
-func writeError(w http.ResponseWriter, err error) {
-    switch {
-    case errors.Is(err, usecase.ErrUserRegistrationEmailDuplicate):
-        http.Error(w, err.Error(), http.StatusConflict)
-    case errors.Is(err, usecase.ErrUserRegistrationInvalidInput):
-        http.Error(w, err.Error(), http.StatusBadRequest)
-    default:
-        http.Error(w, "internal server error", http.StatusInternalServerError)
-    }
+    writeJson(w, http.StatusCreated, resp)
 }
 ```
 
@@ -106,6 +112,7 @@ func writeError(w http.ResponseWriter, err error) {
 ## presentation/dto/ - Presentation の入出力 DTO
 
 **責務**
+
 - HTTP リクエスト/レスポンスの JSON 構造を表現する
 
 **パターン例**
