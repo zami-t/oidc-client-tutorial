@@ -8,6 +8,14 @@ import (
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
 
+type meResponse struct {
+	Subject string `json:"subject"`
+	Issuer  string `json:"issuer"`
+	Email   string `json:"email,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Picture string `json:"picture,omitempty"`
+}
+
 // MeHandler handles GET /me.
 type MeHandler struct {
 	usecase *usecase.MeUsecase
@@ -43,19 +51,12 @@ func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := map[string]any{
-		"subject": output.Subject,
-		"issuer":  output.Issuer,
+	resp := meResponse{
+		Subject: output.Subject,
+		Issuer:  output.Issuer,
+		Email:   output.Email,
+		Name:    output.Name,
+		Picture: output.Picture,
 	}
-	if output.Email != "" {
-		resp["email"] = output.Email
-	}
-	if output.Name != "" {
-		resp["name"] = output.Name
-	}
-	if output.Picture != "" {
-		resp["picture"] = output.Picture
-	}
-
 	writeJson(w, http.StatusOK, resp)
 }
