@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/logger"
@@ -25,12 +26,23 @@ func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
-		writeError(w, usecase.ErrLogoutSessionNotFound)
+		writeJson(w, http.StatusUnauthorized, errorResponse{
+			ErrorDetailCode: "SESSION_NOT_FOUND",
+			Message:         "not authenticated",
+		})
 		return
 	}
 
 	if err := h.usecase.Execute(ctx, ucDto.LogoutInput{SessionId: cookie.Value}); err != nil {
-		writeError(w, err)
+		switch {
+		case errors.Is(err, usecase.ErrLogoutSessionNotFound):
+			writeJson(w, http.StatusUnauthorized, errorResponse{
+				ErrorDetailCode: "SESSION_NOT_FOUND",
+				Message:         "not authenticated",
+			})
+		default:
+			writeServerError(w)
+		}
 		return
 	}
 

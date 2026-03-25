@@ -1,0 +1,4 @@
+summary: 不正なリクエスト
+value:
+  error_detail_code: INVALID_REQUEST
+  message: invalid callback request

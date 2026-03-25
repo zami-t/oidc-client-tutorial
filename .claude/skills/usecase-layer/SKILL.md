@@ -115,7 +115,9 @@ func (u *UserRegistrationUsecase) Execute(ctx context.Context, input dto.UserReg
 - Usecase の入力と出力を表現する
 - Presentation Layer が Domain の型を直接知らないようにする
 
-**パターン例**
+**パターン例（シンプル）**
+
+フィールドが少ない、または型が異なり取り違えのリスクがない場合はそのまま構造体リテラルで生成してよい。
 
 ```go
 package dto
@@ -132,3 +134,61 @@ type UserRegistrationOutput struct {
     Email  string
 }
 ```
+
+**パターン例（Params + バリデーション付きコンストラクタ）**
+
+同じ型のフィールドが複数ある入力 DTO は、呼び出し側でパラメータを取り違えるリスクがある。
+この場合は **生の値を受け取る `XxxParams` 構造体**と、**バリデーション済みの `XxxInput` 構造体**を分離し、
+`NewXxxInput(p XxxParams)` を唯一の生成経路にすることでバリデーション呼び忘れを防ぐ。
+
+```go
+package dto
+
+// XxxParams は Presentation 層が HTTP リクエストから組み立てる生の値の入れ物。
+type XxxParams struct {
+    FieldA string
+    FieldB string
+    FieldC string
+}
+
+// XxxInput はバリデーション済みの Usecase 入力。NewXxxInput 経由でのみ生成できる。
+type XxxInput struct {
+    FieldA string
+    FieldB string
+    FieldC string
+}
+
+// NewXxxInput は params を検証し XxxInput を返す。
+// バリデーションエラーは Presentation 層で 400 にマッピングする。
+func NewXxxInput(p XxxParams) (XxxInput, error) {
+    if p.FieldA == "" {
+        return XxxInput{}, errors.New("FieldA is required")
+    }
+    return XxxInput{
+        FieldA: p.FieldA,
+        FieldB: p.FieldB,
+        FieldC: p.FieldC,
+    }, nil
+}
+```
+
+呼び出し側（Presentation 層）:
+
+```go
+input, err := dto.NewXxxInput(dto.XxxParams{
+    FieldA: q.Get("field_a"),
+    FieldB: q.Get("field_b"),
+    FieldC: q.Get("field_c"),
+})
+if err != nil {
+    writeJson(w, http.StatusBadRequest, errorResponse{...})
+    return
+}
+```
+
+**どちらを使うか**
+
+| 条件 | パターン |
+|------|---------|
+| フィールドが少ない / 型が異なる | 構造体リテラルで直接生成 |
+| 同じ型のフィールドが複数ある | Params + コンストラクタ |

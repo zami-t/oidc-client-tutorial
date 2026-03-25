@@ -58,11 +58,22 @@ get:
           schema:
             type: string
             example: session_id=<session-id>; HttpOnly; Secure; SameSite=Lax; Path=/
+    "400":
+      description: |
+        リクエストパラメータ不正。以下のケースを含む。
+        - state パラメータが欠落
+        - code と error の両方が欠落
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yml
+          examples:
+            invalidRequest:
+              $ref: ../components/examples/ErrorInvalidRequest.yml
     "403":
       description: |
         認証・認可失敗。以下のケースを含む。
         - OP からの error パラメータが存在する（認可拒否等）
-        - code または state が欠落
         - state の検証失敗（不一致、TTL 切れ含む）
         - id_token の署名検証失敗
         - id_token の Claims 検証失敗

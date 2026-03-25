@@ -62,20 +62,19 @@ func (u *CallbackUsecase) Execute(ctx context.Context, input dto.CallbackInput) 
 	// Step 3.1: Handle OP-side authorization errors
 	if input.Error != "" {
 		err := fmt.Errorf("OP returned %q: %w", input.Error, ErrCallbackAuthorizationError)
-		u.log.Info(ctx, "callback: authorization error from OP")
+		switch input.Error {
+		case "access_denied":
+			// User explicitly denied — expected, not a system problem
+			u.log.Info(ctx, "callback: authorization denied by user")
+		case "server_error", "temporarily_unavailable":
+			// OP-side transient failure
+			u.log.Warn(ctx, "callback: OP returned transient error", err)
+		default:
+			// RP configuration issue (invalid_request, unauthorized_client, invalid_scope, etc.)
+			u.log.Warn(ctx, "callback: OP returned authorization error", err)
+		}
 		return dto.CallbackOutput{}, err
 	}
-	if input.State == "" {
-		err := fmt.Errorf("state parameter missing: %w", ErrCallbackStateMismatch)
-		u.log.Info(ctx, "callback: state parameter missing")
-		return dto.CallbackOutput{}, err
-	}
-	if input.Code == "" {
-		err := fmt.Errorf("code parameter missing: %w", ErrCallbackStateMismatch)
-		u.log.Info(ctx, "callback: code parameter missing")
-		return dto.CallbackOutput{}, err
-	}
-
 	// Look up the transaction by state (validates CSRF)
 	tx, err := u.transactionRepo.FindByState(ctx, input.State)
 	if err != nil {

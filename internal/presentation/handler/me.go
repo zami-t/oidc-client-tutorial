@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/usecase"
@@ -21,13 +22,24 @@ func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
-		writeError(w, usecase.ErrMeSessionNotFound)
+		writeJson(w, http.StatusUnauthorized, errorResponse{
+			ErrorDetailCode: "SESSION_NOT_FOUND",
+			Message:         "not authenticated",
+		})
 		return
 	}
 
 	output, err := h.usecase.Execute(ctx, ucDto.MeInput{SessionId: cookie.Value})
 	if err != nil {
-		writeError(w, err)
+		switch {
+		case errors.Is(err, usecase.ErrMeSessionNotFound):
+			writeJson(w, http.StatusUnauthorized, errorResponse{
+				ErrorDetailCode: "SESSION_NOT_FOUND",
+				Message:         "not authenticated",
+			})
+		default:
+			writeServerError(w)
+		}
 		return
 	}
 

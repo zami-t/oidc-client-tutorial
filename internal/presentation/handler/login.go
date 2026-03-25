@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/logger"
@@ -28,7 +29,15 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.usecase.Execute(ctx, input)
 	if err != nil {
-		writeError(w, err)
+		switch {
+		case errors.Is(err, usecase.ErrLoginUnknownIdp):
+			writeJson(w, http.StatusBadRequest, errorResponse{
+				ErrorDetailCode: "UNKNOWN_IDP",
+				Message:         "unknown identity provider",
+			})
+		default:
+			writeServerError(w)
+		}
 		return
 	}
 

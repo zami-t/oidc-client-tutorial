@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"oidc-tutorial/internal/logger"
@@ -24,16 +25,41 @@ func NewCallbackHandler(uc *usecase.CallbackUsecase, sameSite http.SameSite, sec
 func (h *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := r.URL.Query()
-	input := ucDto.CallbackInput{
+	input, err := ucDto.NewCallbackInput(ucDto.CallbackParams{
 		Code:             q.Get("code"),
 		State:            q.Get("state"),
 		Error:            q.Get("error"),
 		ErrorDescription: q.Get("error_description"),
+	})
+	if err != nil {
+		writeJson(w, http.StatusBadRequest, errorResponse{
+			ErrorDetailCode: "INVALID_REQUEST",
+			Message:         "invalid callback request",
+		})
+		return
 	}
 
 	output, err := h.usecase.Execute(ctx, input)
 	if err != nil {
-		writeError(w, err)
+		switch {
+		case errors.Is(err, usecase.ErrCallbackAuthorizationError):
+			writeJson(w, http.StatusForbidden, errorResponse{
+				ErrorDetailCode: "AUTHORIZATION_ERROR",
+				Message:         "authorization error from identity provider",
+			})
+		case errors.Is(err, usecase.ErrCallbackStateMismatch):
+			writeJson(w, http.StatusForbidden, errorResponse{
+				ErrorDetailCode: "STATE_MISMATCH",
+				Message:         "state validation failed",
+			})
+		case errors.Is(err, usecase.ErrCallbackTokenVerificationFailed):
+			writeJson(w, http.StatusForbidden, errorResponse{
+				ErrorDetailCode: "TOKEN_VERIFICATION_FAILED",
+				Message:         "token verification failed",
+			})
+		default:
+			writeServerError(w)
+		}
 		return
 	}
 
