@@ -114,8 +114,8 @@ func InitializeApp() (*App, error) {
 	mux.Handle("GET /me", meH)
 	mux.Handle("GET /health", healthH)
 
-	trace := handler.NewTraceMiddleware(log)
-	return &App{Router: trace(mux)}, nil
+	middleware := handler.NewTraceMiddleware(log, mux)
+	return &App{Router: middleware}, nil
 }
 
 func loadConfig() (*Config, error) {
