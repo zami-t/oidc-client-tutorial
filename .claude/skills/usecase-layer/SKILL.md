@@ -38,6 +38,8 @@ internal/usecase/
 - 各ユースケースが返しうるエラーをファイル先頭の `var` ブロックで定義する
 - port.ErrXxx を `errors.Is` で検出し、自身の ErrXxx でラップして返す
 
+**ログの責務**: `.claude/rules/logging.md` 参照
+
 **パターン例**
 
 ```go
@@ -45,33 +47,38 @@ package usecase
 
 import (
     "context"
+    "errors"
+    "fmt"
     "example.com/project/internal/domain/model"
     "example.com/project/internal/domain/port"
     "example.com/project/internal/domain/service"
+    "example.com/project/internal/logger"
     "example.com/project/internal/usecase/dto"
 )
 
 // センチネルエラーはユースケースファイルの先頭に定義する
 var (
     ErrUserRegistrationEmailDuplicate = errors.New("email already registered")
-    ErrUserRegistrationInvalidInput   = errors.New("invalid input")
 )
 
 type UserRegistrationUsecase struct {
     userRepo        port.UserRepository
     emailService    *service.EmailService
     notificationCli port.NotificationClient
+    log             *logger.Logger
 }
 
 func NewUserRegistrationUsecase(
     userRepo port.UserRepository,
     emailService *service.EmailService,
     notificationCli port.NotificationClient,
+    log *logger.Logger,
 ) *UserRegistrationUsecase {
     return &UserRegistrationUsecase{
         userRepo:        userRepo,
         emailService:    emailService,
         notificationCli: notificationCli,
+        log:             log,
     }
 }
 
@@ -80,7 +87,7 @@ func (u *UserRegistrationUsecase) Execute(ctx context.Context, input dto.UserReg
     // 1. 入力 DTO を Domain の型に変換
     email, err := model.NewEmail(input.Email)
     if err != nil {
-        return dto.UserRegistrationOutput{}, fmt.Errorf("invalid email: %w", ErrUserRegistrationInvalidInput)
+        return dto.UserRegistrationOutput{}, fmt.Errorf("invalid email: %w", err)
     }
 
     userID := model.NewUserID()
@@ -89,17 +96,27 @@ func (u *UserRegistrationUsecase) Execute(ctx context.Context, input dto.UserReg
     // 2. Domain Service を使ったビジネスロジック
     if err := u.emailService.ValidateUniqueness(ctx, email); err != nil {
         if errors.Is(err, port.ErrEmailAlreadyExists) {
+            // ユーザー起因のエラー → Info
+            u.log.Info(ctx, "user-registration: email already registered")
             return dto.UserRegistrationOutput{}, fmt.Errorf("email %s: %w", input.Email, ErrUserRegistrationEmailDuplicate)
         }
-        return dto.UserRegistrationOutput{}, fmt.Errorf("failed to validate email: %w", err)
+        // システムエラー → Error
+        wrapped := fmt.Errorf("failed to validate email uniqueness: %w", err)
+        u.log.Error(ctx, "user-registration: failed to validate email", "USER_REGISTRATION_EMAIL_VALIDATION_FAILED", wrapped)
+        return dto.UserRegistrationOutput{}, wrapped
     }
 
     // 3. Repository への保存
     if err := u.userRepo.Save(ctx, user); err != nil {
-        return dto.UserRegistrationOutput{}, fmt.Errorf("failed to save user: %w", err)
+        wrapped := fmt.Errorf("failed to save user: %w", err)
+        u.log.Error(ctx, "user-registration: failed to save user", "USER_REGISTRATION_SAVE_FAILED", wrapped)
+        return dto.UserRegistrationOutput{}, wrapped
     }
 
-    // 4. Domain の型を DTO に変換して返す
+    // 4. 正常完了ログ
+    u.log.Info(ctx, "user-registration: user registered")
+
+    // 5. Domain の型を DTO に変換して返す
     return dto.UserRegistrationOutput{
         UserID: user.ID().String(),
         Email:  user.Email().String(),

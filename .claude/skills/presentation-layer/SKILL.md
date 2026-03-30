@@ -41,6 +41,8 @@ internal/presentation/
 
 - エラーハンドリングは**各ハンドラーファイル内に直接記述する**
 
+**ログの責務**: `.claude/rules/logging.md` 参照
+
 **パターン例**
 
 ```go
@@ -50,6 +52,7 @@ import (
     "encoding/json"
     "errors"
     "net/http"
+    "example.com/project/internal/logger"
     "example.com/project/internal/usecase"
     usecaseDTO "example.com/project/internal/usecase/dto"
     presentationDTO "example.com/project/internal/presentation/dto"
@@ -57,40 +60,48 @@ import (
 
 type UserRegistrationHandler struct {
     usecase *usecase.UserRegistrationUsecase
+    log     *logger.Logger
 }
 
-func NewUserRegistrationHandler(uc *usecase.UserRegistrationUsecase) *UserRegistrationHandler {
-    return &UserRegistrationHandler{usecase: uc}
+func NewUserRegistrationHandler(uc *usecase.UserRegistrationUsecase, log *logger.Logger) *UserRegistrationHandler {
+    return &UserRegistrationHandler{usecase: uc, log: log}
 }
 
 func (h *UserRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // 1. リクエストボディを Presentation DTO にパース
+    ctx := r.Context()
+
+    // 1. リクエストボディを Usecase DTO にパース・バリデーション
     var req presentationDTO.UserRegistrationRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, "invalid request body", http.StatusBadRequest)
+        h.log.InfoWithError(ctx, "user-registration: invalid request body", err)
+        writeJson(w, http.StatusBadRequest, errorResponse{
+            ErrorDetailCode: "INVALID_REQUEST",
+            Message:         "invalid request body",
+        })
         return
     }
 
-    // 2. Presentation DTO → Usecase DTO
-    input := usecaseDTO.UserRegistrationInput{
+    input, err := usecaseDTO.NewUserRegistrationInput(usecaseDTO.UserRegistrationParams{
         Email: req.Email,
         Name:  req.Name,
+    })
+    if err != nil {
+        h.log.InfoWithError(ctx, "user-registration: invalid input", err)
+        writeJson(w, http.StatusBadRequest, errorResponse{
+            ErrorDetailCode: "INVALID_INPUT",
+            Message:         "invalid request",
+        })
+        return
     }
 
-    // 3. Usecase の実行
-    output, err := h.usecase.Execute(r.Context(), input)
+    // 2. Usecase の実行（戻りエラーはログしない: usecase 側でログ済み）
+    output, err := h.usecase.Execute(ctx, input)
     if err != nil {
-        // このハンドラーが呼ぶユースケースのエラーだけをここで処理する
         switch {
         case errors.Is(err, usecase.ErrUserRegistrationEmailDuplicate):
             writeJson(w, http.StatusConflict, errorResponse{
                 ErrorDetailCode: "EMAIL_DUPLICATE",
                 Message:         "email already registered",
-            })
-        case errors.Is(err, usecase.ErrUserRegistrationInvalidInput):
-            writeJson(w, http.StatusBadRequest, errorResponse{
-                ErrorDetailCode: "INVALID_INPUT",
-                Message:         "invalid request",
             })
         default:
             writeServerError(w)
@@ -98,7 +109,7 @@ func (h *UserRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
         return
     }
 
-    // 4. Usecase DTO → Presentation DTO → レスポンス返却
+    // 3. Usecase DTO → Presentation DTO → レスポンス返却
     resp := presentationDTO.UserRegistrationResponse{
         UserID: output.UserID,
         Email:  output.Email,
