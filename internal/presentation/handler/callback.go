@@ -32,6 +32,7 @@ func (h *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ErrorDescription: q.Get("error_description"),
 	})
 	if err != nil {
+		h.log.InfoWithError(ctx, "callback: invalid input", err)
 		writeJson(w, http.StatusBadRequest, errorResponse{
 			ErrorDetailCode: "INVALID_REQUEST",
 			Message:         "invalid callback request",

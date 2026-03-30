@@ -130,6 +130,11 @@ func (l *Logger) Info(ctx context.Context, message string) {
 	l.write(ctx, LevelInfo, message, "", nil)
 }
 
+// InfoWithError logs a message and error at INFO level.
+func (l *Logger) InfoWithError(ctx context.Context, message string, err error) {
+	l.write(ctx, LevelInfo, message, "", err)
+}
+
 // Warn logs a message and error at WARN level.
 func (l *Logger) Warn(ctx context.Context, message string, err error) {
 	l.write(ctx, LevelWarn, message, "", err)

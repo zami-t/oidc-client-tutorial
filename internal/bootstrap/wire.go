@@ -103,7 +103,7 @@ func InitializeApp() (*App, error) {
 	loginH := handler.NewLoginHandler(loginUC, log)
 	callbackH := handler.NewCallbackHandler(callbackUC, sameSite, cfg.SecureCookie, log)
 	logoutH := handler.NewLogoutHandler(logoutUC, sameSite, cfg.SecureCookie, log)
-	meH := handler.NewMeHandler(meUC)
+	meH := handler.NewMeHandler(meUC, log)
 	healthH := &handler.HealthHandler{}
 
 	// Router (Go 1.22+ method+path routing)

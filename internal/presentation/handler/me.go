@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"oidc-tutorial/internal/logger"
 	"oidc-tutorial/internal/usecase"
 	ucDto "oidc-tutorial/internal/usecase/dto"
 )
@@ -19,17 +20,19 @@ type meResponse struct {
 // MeHandler handles GET /me.
 type MeHandler struct {
 	usecase *usecase.MeUsecase
+	log     *logger.Logger
 }
 
 // NewMeHandler creates a new MeHandler.
-func NewMeHandler(uc *usecase.MeUsecase) *MeHandler {
-	return &MeHandler{usecase: uc}
+func NewMeHandler(uc *usecase.MeUsecase, log *logger.Logger) *MeHandler {
+	return &MeHandler{usecase: uc, log: log}
 }
 
 func (h *MeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
+		h.log.InfoWithError(ctx, "me: session cookie not found", err)
 		writeJson(w, http.StatusUnauthorized, errorResponse{
 			ErrorDetailCode: "SESSION_NOT_FOUND",
 			Message:         "not authenticated",

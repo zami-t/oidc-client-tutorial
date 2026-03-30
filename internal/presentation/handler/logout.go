@@ -26,6 +26,7 @@ func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
+		h.log.InfoWithError(ctx, "logout: session cookie not found", err)
 		writeJson(w, http.StatusUnauthorized, errorResponse{
 			ErrorDetailCode: "SESSION_NOT_FOUND",
 			Message:         "not authenticated",
