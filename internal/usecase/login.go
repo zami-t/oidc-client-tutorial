@@ -17,17 +17,19 @@ import (
 
 // Sentinel errors for LoginUsecase.
 var (
-	ErrLoginUnknownIdp = errors.New("unknown identity provider")
+	ErrLoginUnknownIdp     = errors.New("unknown identity provider")
+	ErrLoginInvalidReturnTo = errors.New("return_to is not an allowed origin")
 )
 
 // LoginUsecase orchestrates the /login endpoint: generates state/nonce,
 // stores the transaction, and builds the OP authorization URL.
 type LoginUsecase struct {
-	transactionRepo port.TransactionRepository
-	discoveryClient port.DiscoveryClient
-	randomGen       service.RandomGenerator
-	transactionTtl  time.Duration
-	log             *logger.Logger
+	transactionRepo          port.TransactionRepository
+	discoveryClient          port.DiscoveryClient
+	randomGen                service.RandomGenerator
+	transactionTtl           time.Duration
+	allowedReturnToOrigins   []string
+	log                      *logger.Logger
 }
 
 // NewLoginUsecase creates a new LoginUsecase.
@@ -36,14 +38,16 @@ func NewLoginUsecase(
 	discoveryClient port.DiscoveryClient,
 	randomGen service.RandomGenerator,
 	transactionTtl time.Duration,
+	allowedReturnToOrigins []string,
 	log *logger.Logger,
 ) *LoginUsecase {
 	return &LoginUsecase{
-		transactionRepo: transactionRepo,
-		discoveryClient: discoveryClient,
-		randomGen:       randomGen,
-		transactionTtl:  transactionTtl,
-		log:             log,
+		transactionRepo:        transactionRepo,
+		discoveryClient:        discoveryClient,
+		randomGen:              randomGen,
+		transactionTtl:         transactionTtl,
+		allowedReturnToOrigins: allowedReturnToOrigins,
+		log:                    log,
 	}
 }
 
@@ -53,6 +57,11 @@ func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.L
 	if !ok {
 		err := fmt.Errorf("idp %q: %w", input.Idp, ErrLoginUnknownIdp)
 		u.log.Info(ctx, "login: unknown idp requested")
+		return dto.LoginOutput{}, err
+	}
+
+	if err := u.validateReturnTo(input.ReturnTo); err != nil {
+		u.log.Info(ctx, "login: invalid return_to")
 		return dto.LoginOutput{}, err
 	}
 
@@ -86,6 +95,26 @@ func (u *LoginUsecase) Execute(ctx context.Context, input dto.LoginInput) (dto.L
 	u.log.Info(ctx, "login: transaction saved")
 	redirectUrl := buildAuthorizationUrl(metadata.AuthorizationEndpoint(), provider, state, nonce)
 	return dto.LoginOutput{RedirectUrl: redirectUrl}, nil
+}
+
+// validateReturnTo checks that return_to's origin matches one of allowedReturnToOrigins.
+func (u *LoginUsecase) validateReturnTo(returnTo string) error {
+	if returnTo == "" {
+		return fmt.Errorf("return_to is required: %w", ErrLoginInvalidReturnTo)
+	}
+
+	parsed, err := url.Parse(returnTo)
+	if err != nil {
+		return fmt.Errorf("return_to parse error: %w", ErrLoginInvalidReturnTo)
+	}
+
+	origin := parsed.Scheme + "://" + parsed.Host
+	for _, allowed := range u.allowedReturnToOrigins {
+		if origin == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("return_to origin %q is not allowed: %w", origin, ErrLoginInvalidReturnTo)
 }
 
 func buildAuthorizationUrl(endpoint string, provider model.Provider, state, nonce string) string {

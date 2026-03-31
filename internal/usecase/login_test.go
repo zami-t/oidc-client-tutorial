@@ -53,7 +53,7 @@ func (s *stubDiscoveryClient) RefreshJwks(_ context.Context, _ model.Issuer, _ s
 
 // --- helpers ---
 
-func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClient) *usecase.LoginUsecase {
+func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClient, allowedOrigins []string) *usecase.LoginUsecase {
 	model.Registry = model.ProviderRegistry{
 		"google": model.NewProvider(
 			"google",
@@ -68,6 +68,7 @@ func buildLoginUsecase(txRepo *stubTransactionRepo, discovery *stubDiscoveryClie
 		discovery,
 		service.RandomGenerator{},
 		10*time.Minute,
+		allowedOrigins,
 		logger.New("test", "test"),
 	)
 }
@@ -85,16 +86,18 @@ func stubMetadata() model.ProviderMetadata {
 	)
 }
 
+const testAllowedOrigin = "https://app.example.com"
+
 // --- tests ---
 
 func TestLoginUsecase_Execute_ValidIdp(t *testing.T) {
 	txRepo := &stubTransactionRepo{}
 	discovery := &stubDiscoveryClient{metadata: stubMetadata()}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, []string{testAllowedOrigin})
 
 	out, err := uc.Execute(context.Background(), ucDto.LoginInput{
 		Idp:      "google",
-		ReturnTo: "/dashboard",
+		ReturnTo: testAllowedOrigin + "/dashboard",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -129,9 +132,10 @@ func TestLoginUsecase_Execute_ValidIdp(t *testing.T) {
 func TestLoginUsecase_Execute_TransactionSaved(t *testing.T) {
 	txRepo := &stubTransactionRepo{}
 	discovery := &stubDiscoveryClient{metadata: stubMetadata()}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, []string{testAllowedOrigin})
 
-	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: "/home"})
+	returnTo := testAllowedOrigin + "/home"
+	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: returnTo})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,8 +149,8 @@ func TestLoginUsecase_Execute_TransactionSaved(t *testing.T) {
 	if tx.Nonce() == "" {
 		t.Error("saved nonce must not be empty")
 	}
-	if tx.ReturnTo() != "/home" {
-		t.Errorf("ReturnTo = %q, want %q", tx.ReturnTo(), "/home")
+	if tx.ReturnTo() != returnTo {
+		t.Errorf("ReturnTo = %q, want %q", tx.ReturnTo(), returnTo)
 	}
 	if tx.Idp() != "google" {
 		t.Errorf("Idp = %q, want %q", tx.Idp(), "google")
@@ -156,7 +160,7 @@ func TestLoginUsecase_Execute_TransactionSaved(t *testing.T) {
 func TestLoginUsecase_Execute_UnknownIdp(t *testing.T) {
 	txRepo := &stubTransactionRepo{}
 	discovery := &stubDiscoveryClient{metadata: stubMetadata()}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, nil)
 
 	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "unknown"})
 	if err == nil {
@@ -171,9 +175,9 @@ func TestLoginUsecase_Execute_DiscoveryError(t *testing.T) {
 	txRepo := &stubTransactionRepo{}
 	discoveryErr := errors.New("discovery failed")
 	discovery := &stubDiscoveryClient{err: discoveryErr}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, []string{testAllowedOrigin})
 
-	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google"})
+	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: testAllowedOrigin + "/dashboard"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -186,9 +190,9 @@ func TestLoginUsecase_Execute_TransactionSaveError(t *testing.T) {
 	saveErr := errors.New("redis unavailable")
 	txRepo := &stubTransactionRepo{saveErr: saveErr}
 	discovery := &stubDiscoveryClient{metadata: stubMetadata()}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, []string{testAllowedOrigin})
 
-	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google"})
+	_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: testAllowedOrigin + "/dashboard"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -197,16 +201,78 @@ func TestLoginUsecase_Execute_TransactionSaveError(t *testing.T) {
 	}
 }
 
+func TestLoginUsecase_Execute_ReturnTo(t *testing.T) {
+	tests := []struct {
+		name           string
+		allowedOrigins []string
+		returnTo       string
+		wantErr        bool
+	}{
+		{
+			name:           "empty return_to is rejected",
+			allowedOrigins: []string{"https://app.example.com"},
+			returnTo:       "",
+			wantErr:        true,
+		},
+		{
+			name:           "matching origin",
+			allowedOrigins: []string{"https://app.example.com"},
+			returnTo:       "https://app.example.com/dashboard",
+			wantErr:        false,
+		},
+		{
+			name:           "non-matching origin",
+			allowedOrigins: []string{"https://app.example.com"},
+			returnTo:       "https://evil.example.com/phishing",
+			wantErr:        true,
+		},
+		{
+			name:           "empty allowlist rejects absolute URL",
+			allowedOrigins: nil,
+			returnTo:       "https://app.example.com/dashboard",
+			wantErr:        true,
+		},
+		{
+			name:           "protocol-relative URL is rejected",
+			allowedOrigins: []string{"https://app.example.com"},
+			returnTo:       "//evil.example.com/phishing",
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			txRepo := &stubTransactionRepo{}
+			discovery := &stubDiscoveryClient{metadata: stubMetadata()}
+			uc := buildLoginUsecase(txRepo, discovery, tt.allowedOrigins)
+
+			_, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: tt.returnTo})
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !errors.Is(err, usecase.ErrLoginInvalidReturnTo) {
+					t.Errorf("error = %v, want ErrLoginInvalidReturnTo", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestLoginUsecase_Execute_StateAndNonceAreUnique(t *testing.T) {
 	txRepo := &stubTransactionRepo{}
 	discovery := &stubDiscoveryClient{metadata: stubMetadata()}
-	uc := buildLoginUsecase(txRepo, discovery)
+	uc := buildLoginUsecase(txRepo, discovery, []string{testAllowedOrigin})
 
-	out1, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google"})
+	out1, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: testAllowedOrigin + "/dashboard"})
 	if err != nil {
 		t.Fatalf("first execute: %v", err)
 	}
-	out2, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google"})
+	out2, err := uc.Execute(context.Background(), ucDto.LoginInput{Idp: "google", ReturnTo: testAllowedOrigin + "/dashboard"})
 	if err != nil {
 		t.Fatalf("second execute: %v", err)
 	}

@@ -20,6 +20,7 @@
 | 4 | `id_token` の偽造・改ざん | 署名検証（JWS） | [RFC 7515 §5](https://datatracker.ietf.org/doc/html/rfc7515#section-5) |
 | 5 | `id_token` の妥当性検証（`iss` / `aud` / `exp`） | Claim 検証（設定した値と一致するか） | [OIDC Core 1.0 §3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) |
 | 6 | 未使用エントリによるセッション攻撃 | セッションストレージの TTL + 使用後削除 | [RFC 6749 §4.1.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2) |
+| 7 | オープンリダイレクト（`return_to` パラメータ） | `return_to` のオリジンを許可リスト（`ALLOWED_RETURN_TO_ORIGINS`）と照合。相対パスは同一オリジンとして常に許可 | — |
 
 ---
 

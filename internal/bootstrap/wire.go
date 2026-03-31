@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -28,9 +29,10 @@ type Config struct {
 	AuthMethod              model.AuthMethod
 	SessionTtl              time.Duration
 	TransactionTtl          time.Duration
-	SecureCookie            bool
-	RedisAddr               string
-	DiscoveryTimeoutSeconds int
+	SecureCookie               bool
+	RedisAddr                  string
+	DiscoveryTimeoutSeconds    int
+	AllowedReturnToOrigins     []string
 }
 
 // App holds the configured HTTP router.
@@ -83,6 +85,7 @@ func InitializeApp() (*App, error) {
 		orchestrator,
 		randomGen,
 		cfg.TransactionTtl,
+		cfg.AllowedReturnToOrigins,
 		log,
 	)
 	callbackUC := usecase.NewCallbackUsecase(
@@ -187,6 +190,11 @@ func loadConfig() (*Config, error) {
 		discoveryTimeoutSeconds = seconds
 	}
 
+	var allowedReturnToOrigins []string
+	if v := os.Getenv("ALLOWED_RETURN_TO_ORIGINS"); v != "" {
+		allowedReturnToOrigins = strings.Split(v, ",")
+	}
+
 	return &Config{
 		Port:                    port,
 		Version:                 version,
@@ -199,5 +207,6 @@ func loadConfig() (*Config, error) {
 		SecureCookie:            secureCookie,
 		RedisAddr:               redisAddr,
 		DiscoveryTimeoutSeconds: discoveryTimeoutSeconds,
+		AllowedReturnToOrigins:  allowedReturnToOrigins,
 	}, nil
 }

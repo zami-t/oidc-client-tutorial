@@ -35,6 +35,11 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				ErrorDetailCode: "UNKNOWN_IDP",
 				Message:         "unknown identity provider",
 			})
+		case errors.Is(err, usecase.ErrLoginInvalidReturnTo):
+			writeJson(w, http.StatusBadRequest, errorResponse{
+				ErrorDetailCode: "INVALID_RETURN_TO",
+				Message:         "return_to is not an allowed origin",
+			})
 		default:
 			writeServerError(w)
 		}
