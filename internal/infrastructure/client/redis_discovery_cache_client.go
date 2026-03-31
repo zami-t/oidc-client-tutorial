@@ -56,7 +56,7 @@ func (c *redisDiscoveryCacheClient) GetProviderMetadata(ctx context.Context, iss
 	), nil
 }
 
-func (c *redisDiscoveryCacheClient) SetProviderMetadata(ctx context.Context, issuer model.Issuer, metadata model.ProviderMetadata) error {
+func (c *redisDiscoveryCacheClient) SaveProviderMetadata(ctx context.Context, issuer model.Issuer, metadata model.ProviderMetadata) error {
 	raw := dto.DiscoveryResponse{
 		Issuer:                           metadata.Issuer().String(),
 		AuthorizationEndpoint:            metadata.AuthorizationEndpoint(),
@@ -98,7 +98,7 @@ func (c *redisDiscoveryCacheClient) GetJwks(ctx context.Context, issuer model.Is
 	return model.NewJwkSet(keys), nil
 }
 
-func (c *redisDiscoveryCacheClient) SetJwks(ctx context.Context, issuer model.Issuer, jwks model.JwkSet) error {
+func (c *redisDiscoveryCacheClient) SaveJwks(ctx context.Context, issuer model.Issuer, jwks model.JwkSet) error {
 	keys := make([]dto.JwkDto, 0, len(jwks.Keys()))
 	for _, k := range jwks.Keys() {
 		keys = append(keys, dto.JwkDto{

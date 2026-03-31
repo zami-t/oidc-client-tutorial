@@ -37,7 +37,7 @@ func (c *orchestrateDiscoveryClient) fetchAndCacheMetadata(ctx context.Context, 
 	if err != nil {
 		return model.ProviderMetadata{}, err
 	}
-	_ = c.discoveryCacheClient.SetProviderMetadata(ctx, issuer, metadata)
+	_ = c.discoveryCacheClient.SaveProviderMetadata(ctx, issuer, metadata)
 	return metadata, nil
 }
 
@@ -61,7 +61,7 @@ func (c *orchestrateDiscoveryClient) fetchAndCacheJwks(ctx context.Context, issu
 	if err != nil {
 		return model.JwkSet{}, err
 	}
-	_ = c.discoveryCacheClient.SetJwks(ctx, issuer, jwks)
+	_ = c.discoveryCacheClient.SaveJwks(ctx, issuer, jwks)
 	return jwks, nil
 }
 
@@ -71,6 +71,6 @@ func (c *orchestrateDiscoveryClient) RefreshJwks(ctx context.Context, issuer mod
 	if err != nil {
 		return model.JwkSet{}, err
 	}
-	_ = c.discoveryCacheClient.SetJwks(ctx, issuer, jwks)
+	_ = c.discoveryCacheClient.SaveJwks(ctx, issuer, jwks)
 	return jwks, nil
 }
