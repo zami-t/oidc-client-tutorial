@@ -68,6 +68,7 @@ func buildHandlerLoginUsecase(txRepo *handlerStubTransactionRepo, discovery *han
 		discovery,
 		service.RandomGenerator{},
 		10*time.Minute,
+		[]string{"https://app.example.com"},
 		logger.New("test", "test"),
 	)
 }
@@ -97,7 +98,7 @@ func TestLoginHandler_ValidIdp_Redirects(t *testing.T) {
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
 	h := handler.NewLoginHandler(uc, testLogger())
 
-	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
+	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=https://app.example.com/dashboard", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -166,7 +167,7 @@ func TestLoginHandler_DiscoveryError_Returns500(t *testing.T) {
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
 	h := handler.NewLoginHandler(uc, testLogger())
 
-	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
+	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=https://app.example.com/dashboard", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -181,7 +182,7 @@ func TestLoginHandler_TransactionSaveError_Returns500(t *testing.T) {
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
 	h := handler.NewLoginHandler(uc, testLogger())
 
-	req := httptest.NewRequest(http.MethodGet, "/login?idp=google", nil)
+	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=https://app.example.com/dashboard", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -197,7 +198,7 @@ func TestLoginHandler_ReturnTo_NotIncludedInRedirectUrl(t *testing.T) {
 	uc := buildHandlerLoginUsecase(txRepo, discovery)
 	h := handler.NewLoginHandler(uc, testLogger())
 
-	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=/dashboard", nil)
+	req := httptest.NewRequest(http.MethodGet, "/login?idp=google&return_to=https://app.example.com/dashboard", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
