@@ -11,15 +11,14 @@ import (
 
 // LogoutHandler handles POST /logout.
 type LogoutHandler struct {
-	usecase      *usecase.LogoutUsecase
-	sameSite     http.SameSite
-	secureCookie bool
-	log          *logger.Logger
+	usecase       *usecase.LogoutUsecase
+	log           *logger.Logger
+	cookieManager *CookieManager
 }
 
 // NewLogoutHandler creates a new LogoutHandler.
-func NewLogoutHandler(uc *usecase.LogoutUsecase, sameSite http.SameSite, secureCookie bool, log *logger.Logger) *LogoutHandler {
-	return &LogoutHandler{usecase: uc, sameSite: sameSite, secureCookie: secureCookie, log: log}
+func NewLogoutHandler(uc *usecase.LogoutUsecase, log *logger.Logger, cookieManager *CookieManager) *LogoutHandler {
+	return &LogoutHandler{usecase: uc, log: log, cookieManager: cookieManager}
 }
 
 func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -48,14 +47,6 @@ func (h *LogoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.log.Info(ctx, "logout: session deleted")
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_id",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   h.secureCookie,
-		SameSite: h.sameSite,
-		MaxAge:   -1,
-	})
+	http.SetCookie(w, h.cookieManager.clearSessionCookie())
 	w.WriteHeader(http.StatusOK)
 }

@@ -11,15 +11,14 @@ import (
 
 // CallbackHandler handles GET /callback.
 type CallbackHandler struct {
-	usecase      *usecase.CallbackUsecase
-	sameSite     http.SameSite
-	secureCookie bool
-	log          *logger.Logger
+	usecase       *usecase.CallbackUsecase
+	log           *logger.Logger
+	cookieManager *CookieManager
 }
 
 // NewCallbackHandler creates a new CallbackHandler.
-func NewCallbackHandler(uc *usecase.CallbackUsecase, sameSite http.SameSite, secureCookie bool, log *logger.Logger) *CallbackHandler {
-	return &CallbackHandler{usecase: uc, sameSite: sameSite, secureCookie: secureCookie, log: log}
+func NewCallbackHandler(uc *usecase.CallbackUsecase, log *logger.Logger, cookies *CookieManager) *CallbackHandler {
+	return &CallbackHandler{usecase: uc, log: log, cookieManager: cookies}
 }
 
 func (h *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,13 +64,6 @@ func (h *CallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.log.Info(ctx, "callback: session created, redirecting")
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_id",
-		Value:    output.SessionId,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   h.secureCookie,
-		SameSite: h.sameSite,
-	})
+	http.SetCookie(w, h.cookieManager.newSessionCookie(output.SessionId))
 	http.Redirect(w, r, output.ReturnTo, http.StatusFound)
 }

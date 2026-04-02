@@ -19,20 +19,25 @@ import (
 	"oidc-tutorial/internal/usecase"
 )
 
-// Config holds application configuration loaded from environment variables.
-type Config struct {
-	Port                    string
-	Version                 string
-	GoogleClientId          string
-	GoogleClientSecret      string
-	RedirectUri             string
-	AuthMethod              model.AuthMethod
-	SessionTtl              time.Duration
-	TransactionTtl          time.Duration
-	SecureCookie               bool
-	RedisAddr                  string
-	DiscoveryTimeoutSeconds    int
-	AllowedReturnToOrigins     []string
+type sessionCookieConfig struct {
+	secure   bool
+	sameSite http.SameSite
+}
+
+// config holds application configuration loaded from environment variables.
+type config struct {
+	port                    string
+	version                 string
+	googleClientId          string
+	googleClientSecret      string
+	redirectUri             string
+	authMethod              model.AuthMethod
+	sessionTtl              time.Duration
+	transactionTtl          time.Duration
+	sessionCookie           sessionCookieConfig
+	redisAddr               string
+	discoveryTimeoutSeconds int
+	allowedReturnToOrigins  []string
 }
 
 // App holds the configured HTTP router.
@@ -47,15 +52,15 @@ func InitializeApp() (*App, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	log := logger.New("oidc-client", cfg.Version)
+	log := logger.New("oidc-client", cfg.version)
 
 	// Infrastructure
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: cfg.RedisAddr,
+		Addr: cfg.redisAddr,
 	})
 	transactionRepo := repository.NewRedisTransactionRepository(redisClient)
 	sessionRepo := repository.NewRedisSessionRepository(redisClient)
-	discoveryClient := infraClient.NewHttpDiscoveryClient(time.Duration(cfg.DiscoveryTimeoutSeconds) * time.Second)
+	discoveryClient := infraClient.NewHttpDiscoveryClient(time.Duration(cfg.discoveryTimeoutSeconds) * time.Second)
 	discoveryCacheClient := infraClient.NewRedisDiscoveryCacheClient(
 		redisClient,
 		6*time.Hour, // metadata TTL
@@ -73,9 +78,9 @@ func InitializeApp() (*App, error) {
 		"google": model.NewProvider(
 			"google",
 			model.NewIssuer("https://accounts.google.com"),
-			model.NewClient(cfg.GoogleClientId, cfg.GoogleClientSecret, model.NewRedirectUri(cfg.RedirectUri)),
+			model.NewClient(cfg.googleClientId, cfg.googleClientSecret, model.NewRedirectUri(cfg.redirectUri)),
 			[]string{"openid", "email", "profile"},
-			cfg.AuthMethod,
+			cfg.authMethod,
 		),
 	}
 
@@ -84,8 +89,8 @@ func InitializeApp() (*App, error) {
 		transactionRepo,
 		orchestrator,
 		randomGen,
-		cfg.TransactionTtl,
-		cfg.AllowedReturnToOrigins,
+		cfg.transactionTtl,
+		cfg.allowedReturnToOrigins,
 		log,
 	)
 	callbackUC := usecase.NewCallbackUsecase(
@@ -95,17 +100,17 @@ func InitializeApp() (*App, error) {
 		tokenClient,
 		tokenVerifier,
 		randomGen,
-		cfg.SessionTtl,
+		cfg.sessionTtl,
 		log,
 	)
 	logoutUC := usecase.NewLogoutUsecase(sessionRepo, log)
 	meUC := usecase.NewMeUsecase(sessionRepo, log)
 
 	// Handlers
-	sameSite := http.SameSiteLaxMode
+	cookieManager := handler.NewCookieManager(cfg.sessionCookie.secure, cfg.sessionCookie.sameSite)
 	loginH := handler.NewLoginHandler(loginUC, log)
-	callbackH := handler.NewCallbackHandler(callbackUC, sameSite, cfg.SecureCookie, log)
-	logoutH := handler.NewLogoutHandler(logoutUC, sameSite, cfg.SecureCookie, log)
+	callbackH := handler.NewCallbackHandler(callbackUC, log, cookieManager)
+	logoutH := handler.NewLogoutHandler(logoutUC, log, cookieManager)
 	meH := handler.NewMeHandler(meUC, log)
 	healthH := &handler.HealthHandler{}
 
@@ -121,7 +126,7 @@ func InitializeApp() (*App, error) {
 	return &App{Router: middleware}, nil
 }
 
-func loadConfig() (*Config, error) {
+func loadConfig() (*config, error) {
 	version := os.Getenv("VERSION")
 	if version == "" {
 		version = "unknown"
@@ -163,12 +168,20 @@ func loadConfig() (*Config, error) {
 		transactionTtl = time.Duration(minutes) * time.Minute
 	}
 
-	secureCookie := false
-	if v := os.Getenv("SECURE_COOKIE"); v != "" {
+	cookieSecure := false
+	if v := os.Getenv("COOKIE_SECURE"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err == nil {
-			secureCookie = parsed
+			cookieSecure = parsed
 		}
+	}
+
+	cookieSameSite := http.SameSiteLaxMode
+	switch os.Getenv("COOKIE_SAME_SITE") {
+	case "strict":
+		cookieSameSite = http.SameSiteStrictMode
+	case "none":
+		cookieSameSite = http.SameSiteNoneMode
 	}
 
 	port := os.Getenv("PORT")
@@ -195,18 +208,21 @@ func loadConfig() (*Config, error) {
 		allowedReturnToOrigins = strings.Split(v, ",")
 	}
 
-	return &Config{
-		Port:                    port,
-		Version:                 version,
-		GoogleClientId:          clientId,
-		GoogleClientSecret:      clientSecret,
-		RedirectUri:             redirectUri,
-		AuthMethod:              authMethod,
-		SessionTtl:              sessionTtl,
-		TransactionTtl:          transactionTtl,
-		SecureCookie:            secureCookie,
-		RedisAddr:               redisAddr,
-		DiscoveryTimeoutSeconds: discoveryTimeoutSeconds,
-		AllowedReturnToOrigins:  allowedReturnToOrigins,
+	return &config{
+		port:               port,
+		version:            version,
+		googleClientId:     clientId,
+		googleClientSecret: clientSecret,
+		redirectUri:        redirectUri,
+		authMethod:         authMethod,
+		sessionTtl:         sessionTtl,
+		transactionTtl:     transactionTtl,
+		sessionCookie: sessionCookieConfig{
+			secure:   cookieSecure,
+			sameSite: cookieSameSite,
+		},
+		redisAddr:               redisAddr,
+		discoveryTimeoutSeconds: discoveryTimeoutSeconds,
+		allowedReturnToOrigins:  allowedReturnToOrigins,
 	}, nil
 }

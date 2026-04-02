@@ -366,6 +366,40 @@ func Distance(p1, p2 Point) float64 {} // 値で渡す
 - 構造体が小さい
 - 不変性を保ちたい
 
+### フィールドの公開範囲
+
+**原則: struct のフィールドは unexported にする。**
+exported にするのは、以下のケースに限る。
+
+| ケース | 理由 |
+|--------|------|
+| JSON/XML 等のシリアライズが必要 | `encoding/json` 等は unexported フィールドを無視する |
+| 別パッケージから直接フィールドを読み書きする必要がある | コンストラクタ（`New...`）で回避できないか先に検討する |
+
+```go
+// ✅ Good: フィールドは unexported、コンストラクタで初期化
+type server struct {
+    port    string
+    timeout time.Duration
+}
+
+func newServer(port string, timeout time.Duration) *server {
+    return &server{port: port, timeout: timeout}
+}
+
+// ✅ Good: シリアライズが必要な DTO は exported
+type UserResponse struct {
+    ID    string `json:"id"`
+    Email string `json:"email"`
+}
+
+// ❌ Bad: 理由なく全フィールドを exported にする
+type server struct {
+    Port    string
+    Timeout time.Duration
+}
+```
+
 ---
 
 ## Import の整理

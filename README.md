@@ -39,7 +39,8 @@ GoでOpenID Connect (OIDC) のRelying Partyを実装
 | `REDIS_ADDR` | Redis の接続先 | `localhost:6379` |
 | `SESSION_TTL_MINUTES` | ログインセッションの有効期限（分） | `60` |
 | `TRANSACTION_TTL_MINUTES` | 認可トランザクション（state/nonce）の有効期限（分） | `10` |
-| `SECURE_COOKIE` | Cookie に `Secure` 属性を付与するか（本番では `true` 推奨） | `false` |
+| `COOKIE_SECURE` | Cookie に `Secure` 属性を付与するか（本番では `true` 推奨） | `false` |
+| `COOKIE_SAME_SITE` | Cookie の `SameSite` 属性（`lax` / `strict` / `none`） | `lax` |
 | `AUTH_METHOD` | Token Endpoint の認証方式（`basic` or `post`） | `basic` |
 | `DISCOVERY_TIMEOUT_SECONDS` | OIDC Discovery リクエストのタイムアウト（秒） | `10` |
 | `VERSION` | ログに出力するサービスバージョン | `unknown` |
