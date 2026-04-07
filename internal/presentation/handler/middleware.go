@@ -22,14 +22,8 @@ func (r *statusRecorder) WriteHeader(code int) {
 // span_id) into every request context and logs the request/response pair.
 func NewTraceMiddleware(log *logger.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		traceId, err := logger.NewTraceId()
-		if err != nil {
-			traceId = "unknown"
-		}
-		spanId, err := logger.NewSpanId()
-		if err != nil {
-			spanId = "unknown"
-		}
+		traceId := logger.NewTraceId()
+		spanId := logger.NewSpanId()
 
 		ctx := logger.WithSpanContext(r.Context(), logger.SpanContext{
 			TraceId: traceId,

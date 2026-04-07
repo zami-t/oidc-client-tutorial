@@ -34,23 +34,19 @@ func spanContextFrom(ctx context.Context) SpanContext {
 const traceIdByteLength = 16 // 16 bytes = 32 hex chars
 
 // NewTraceId generates a cryptographically random 32-char hex string (16 bytes).
-func NewTraceId() (string, error) {
+func NewTraceId() string {
 	b := make([]byte, traceIdByteLength)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
+	rand.Read(b) //nolint:errcheck // crypto/rand.Read never returns an error since Go 1.20
+	return hex.EncodeToString(b)
 }
 
 const spanIdByteLength = 8 // 8 bytes = 16 hex chars
 
 // NewSpanId generates a cryptographically random 16-char hex string (8 bytes).
-func NewSpanId() (string, error) {
+func NewSpanId() string {
 	b := make([]byte, spanIdByteLength)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
+	rand.Read(b) //nolint:errcheck // crypto/rand.Read never returns an error since Go 1.20
+	return hex.EncodeToString(b)
 }
 
 // Logger writes structured JSON log entries using slog.
