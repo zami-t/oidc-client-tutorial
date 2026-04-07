@@ -5,22 +5,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
-	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
-	"time"
-)
-
-// Level represents a log severity level.
-type Level string
-
-const (
-	LevelDebug Level = "DEBUG"
-	LevelInfo  Level = "INFO"
-	LevelWarn  Level = "WARN"
-	LevelError Level = "ERROR"
 )
 
 type spanContextKey struct{}
@@ -65,84 +53,65 @@ func NewSpanId() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// Logger writes structured JSON log entries to an output writer.
+// Logger writes structured JSON log entries using slog.
 type Logger struct {
-	service    string
-	appVersion string
-	out        io.Writer
+	slog *slog.Logger
 }
 
-// New creates a Logger that writes to stdout.
+// New creates a Logger that writes JSON to stdout.
+// Call this after setting Service and Version.
 func New(service, version string) *Logger {
+	h := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+	})
 	return &Logger{
-		service:    service,
-		appVersion: version,
-		out:        os.Stdout,
+		slog: slog.New(h).With("service", service, "version", version),
 	}
 }
 
-// logEntry is the JSON structure for a single log line.
-type logEntry struct {
-	Timestamp    string `json:"timestamp"`
-	Level        Level  `json:"level"`
-	Service      string `json:"service"`
-	Version      string `json:"version"`
-	TraceId      string `json:"trace_id,omitempty"`
-	SpanId       string `json:"span_id,omitempty"`
-	ParentSpanId string `json:"parent_span_id,omitempty"`
-	Message      string `json:"message"`
-	ErrorCode    string `json:"error_code,omitempty"`
-	Error        string `json:"error,omitempty"`
-	StackTrace   string `json:"stack_trace,omitempty"`
-}
-
-func (l *Logger) write(ctx context.Context, level Level, message, errorCode string, err error) {
+func (l *Logger) withTrace(ctx context.Context) *slog.Logger {
 	sc := spanContextFrom(ctx)
-	entry := logEntry{
-		Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
-		Level:        level,
-		Service:      l.service,
-		Version:      l.appVersion,
-		TraceId:      sc.TraceId,
-		SpanId:       sc.SpanId,
-		ParentSpanId: sc.ParentSpanId,
-		Message:      message,
+	sl := l.slog
+	if sc.TraceId != "" {
+		sl = sl.With("trace_id", sc.TraceId)
 	}
-	if err != nil {
-		entry.ErrorCode = errorCode
-		entry.Error = err.Error()
-		if level == LevelError {
-			entry.StackTrace = captureStack()
-		}
+	if sc.SpanId != "" {
+		sl = sl.With("span_id", sc.SpanId)
 	}
-	b, _ := json.Marshal(entry)
-	b = append(b, '\n')
-	_, _ = l.out.Write(b)
+	if sc.ParentSpanId != "" {
+		sl = sl.With("parent_span_id", sc.ParentSpanId)
+	}
+	return sl
 }
 
 // Debug logs a message at DEBUG level.
 func (l *Logger) Debug(ctx context.Context, message string) {
-	l.write(ctx, LevelDebug, message, "", nil)
+	l.withTrace(ctx).Debug(message)
 }
 
 // Info logs a message at INFO level.
 func (l *Logger) Info(ctx context.Context, message string) {
-	l.write(ctx, LevelInfo, message, "", nil)
+	l.withTrace(ctx).Info(message)
 }
 
 // InfoWithError logs a message and error at INFO level.
 func (l *Logger) InfoWithError(ctx context.Context, message string, err error) {
-	l.write(ctx, LevelInfo, message, "", err)
+	l.withTrace(ctx).Info(message, slog.String("error", err.Error()))
 }
 
 // Warn logs a message and error at WARN level.
 func (l *Logger) Warn(ctx context.Context, message string, err error) {
-	l.write(ctx, LevelWarn, message, "", err)
+	l.withTrace(ctx).Warn(message, slog.String("error", err.Error()))
 }
 
 // Error logs a message, error code, and error at ERROR level (includes stack trace).
 func (l *Logger) Error(ctx context.Context, message, errorCode string, err error) {
-	l.write(ctx, LevelError, message, errorCode, err)
+	l.withTrace(ctx).Error(message,
+		slog.String("error_code", errorCode),
+		slog.String("error", err.Error()),
+		slog.String("stack_trace", captureStack()),
+	)
 }
 
 const stackBufSize = 4096

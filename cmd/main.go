@@ -10,8 +10,14 @@ import (
 	"oidc-tutorial/internal/logger"
 )
 
+// Service and Version are set once at startup (in main) and included in every log entry.
+const (
+	service = "oidc-client"
+	version = "1.0.0"
+)
+
 func main() {
-	log := logger.New("oidc-client", "0.1.0")
+	log := logger.New(service, version)
 	ctx := context.Background()
 
 	app, err := bootstrap.InitializeApp()
