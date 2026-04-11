@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -40,11 +41,38 @@ type config struct {
 	allowedReturnToOrigins  []string
 }
 
-// InitializeServer wires all dependencies and returns the application.
-func InitializeServer() (http.Handler, string, error) {
+// Server wraps the HTTP server and external connections, providing lifecycle management.
+type Server struct {
+	httpServer  *http.Server
+	redisClient *redis.Client
+}
+
+// Addr returns the listening address of the server.
+func (s *Server) Addr() string {
+	return s.httpServer.Addr
+}
+
+// ListenAndServe starts the HTTP server.
+func (s *Server) ListenAndServe() error {
+	return s.httpServer.ListenAndServe()
+}
+
+// GracefulShutdown drains active HTTP connections then closes external connections.
+func (s *Server) GracefulShutdown(ctx context.Context) error {
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		return fmt.Errorf("http shutdown: %w", err)
+	}
+	if err := s.redisClient.Close(); err != nil {
+		return fmt.Errorf("redis close: %w", err)
+	}
+	return nil
+}
+
+// InitializeServer wires all dependencies and returns a ready-to-run Server.
+func InitializeServer() (*Server, error) {
 	cfg, err := loadConfig()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	log := logger.New("oidc-client", cfg.version)
@@ -118,7 +146,13 @@ func InitializeServer() (http.Handler, string, error) {
 	mux.Handle("GET /health", healthH)
 
 	router := handler.NewTraceMiddleware(log, mux)
-	return router, cfg.port, nil
+	return &Server{
+		httpServer: &http.Server{
+			Addr:    ":" + cfg.port,
+			Handler: router,
+		},
+		redisClient: redisClient,
+	}, nil
 }
 
 func loadConfig() (*config, error) {
