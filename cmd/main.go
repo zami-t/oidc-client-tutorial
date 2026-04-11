@@ -49,7 +49,9 @@ func main() {
 		}
 	case err := <-errCh:
 		log.Error(ctx, fmt.Sprintf("unexpected server error: %v", err), "SERVER_ERROR", err)
-		srv.GracefulShutdown(context.Background()) //nolint:errcheck
+		if err := srv.CloseExternalConnections(); err != nil {
+			log.Error(ctx, fmt.Sprintf("error closing resources: %v", err), "CLOSE_ERROR", err)
+		}
 	}
 
 	log.Info(ctx, "server shutdown complete")

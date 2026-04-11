@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -58,10 +59,21 @@ func (s *Server) ListenAndServe() error {
 }
 
 // GracefulShutdown drains active HTTP connections then closes external connections.
+// Both errors are returned if multiple failures occur.
 func (s *Server) GracefulShutdown(ctx context.Context) error {
+	var httpErr, redisErr error
 	if err := s.httpServer.Shutdown(ctx); err != nil {
-		return fmt.Errorf("http shutdown: %w", err)
+		httpErr = fmt.Errorf("http shutdown: %w", err)
 	}
+	if err := s.redisClient.Close(); err != nil {
+		redisErr = fmt.Errorf("redis close: %w", err)
+	}
+	return errors.Join(httpErr, redisErr)
+}
+
+// CloseExternalConnections closes external connections without draining HTTP.
+// Use this when the HTTP server has already stopped.
+func (s *Server) CloseExternalConnections() error {
 	if err := s.redisClient.Close(); err != nil {
 		return fmt.Errorf("redis close: %w", err)
 	}
