@@ -40,16 +40,11 @@ type config struct {
 	allowedReturnToOrigins  []string
 }
 
-// App holds the configured HTTP router.
-type App struct {
-	Router http.Handler
-}
-
-// InitializeApp wires all dependencies and returns the application.
-func InitializeApp() (*App, error) {
+// InitializeServer wires all dependencies and returns the application.
+func InitializeServer() (http.Handler, string, error) {
 	cfg, err := loadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, "", fmt.Errorf("failed to load config: %w", err)
 	}
 
 	log := logger.New("oidc-client", cfg.version)
@@ -122,8 +117,8 @@ func InitializeApp() (*App, error) {
 	mux.Handle("GET /me", meH)
 	mux.Handle("GET /health", healthH)
 
-	middleware := handler.NewTraceMiddleware(log, mux)
-	return &App{Router: middleware}, nil
+	router := handler.NewTraceMiddleware(log, mux)
+	return router, cfg.port, nil
 }
 
 func loadConfig() (*config, error) {

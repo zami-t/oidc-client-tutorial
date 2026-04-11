@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"oidc-tutorial/internal/bootstrap"
 	"oidc-tutorial/internal/logger"
@@ -17,23 +20,43 @@ const (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	log := logger.New(service, version)
-	ctx := context.Background()
 
-	app, err := bootstrap.InitializeApp()
+	handler, port, err := bootstrap.InitializeServer()
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to initialize app: %v", err), "INIT_FAILED", err)
 		os.Exit(1)
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: handler,
 	}
 
 	log.Info(ctx, fmt.Sprintf("starting server on :%s", port))
-	if err := http.ListenAndServe(":"+port, app.Router); err != nil {
-		log.Error(ctx, fmt.Sprintf("server error: %v", err), "SERVER_ERROR", err)
-		os.Exit(1)
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		stop()
+		log.Info(ctx, "shutting down server gracefully")
+	case err := <-errCh:
+		log.Error(ctx, fmt.Sprintf("unexpected server error: %v", err), "SERVER_ERROR", err)
+		return
 	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error(ctx, fmt.Sprintf("error during server shutdown: %v", err), "SHUTDOWN_ERROR", err)
+	}
+	// close any other resources if needed (e.g., database connections)
+	log.Info(ctx, "server shutdown complete")
 }
